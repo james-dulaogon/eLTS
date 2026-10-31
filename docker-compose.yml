@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # 1. DATABASE RUNTIME ENGINE
+  postgres_db:
+    image: postgres:15-alpine
+    container_name: elts_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      # Maps data files directly into your Synology file system mount directory
+      - nas_postgres_data:/var/lib/postgresql/data
+    networks:
+      - elts_local_network
+
+  # 2. EXPRESS BACKEND SYSTEM API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: elts_backend
+    restart: always
+    ports:
+      - "${BACKEND_PORT}:${BACKEND_PORT}"
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      JWT_SECRET: ${JWT_SECRET}
+      DB_HOST: postgres_db
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+      PORT: ${BACKEND_PORT}
+    volumes:
+      # Shared persistent volume for PDF tracking files (received docs, report sheets)
+      - nas_uploaded_documents:/app/uploads
+    depends_on:
+      - postgres_db
+    networks:
+      - elts_local_network
+
+  # 3. REACT FRONTEND PRODUCTION LAYER
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: elts_frontend
+    restart: always
+    ports:
+      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
+    depends_on:
+      - backend
+    networks:
+      - elts_local_network
+
+volumes:
+  nas_postgres_data:
+    driver: local
+  nas_uploaded_documents:
+    driver: local
+
+networks:
+  elts_local_network:
+    driver: bridge
