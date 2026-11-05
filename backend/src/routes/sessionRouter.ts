@@ -40,4 +40,35 @@ router.put('/switch', authenticateToken, authorizeRoles('Admin'), async (req: Au
     }
 });
 
+// REGISTER A NEW LEGISLATURE TERM (Exclusive to Admin)
+router.post('/', authenticateToken, authorizeRoles('Admin'), async (req: AuthenticatedRequest, res: express.Response) => {
+    const { term_label } = req.body;
+
+    if (!term_label || term_label.trim() === '') {
+        return res.status(400).json({ error: 'Validation Error: Legislative term label cannot be blank.' });
+    }
+
+    try {
+        const queryText = `
+            INSERT INTO legislatures (term_label, is_active, updated_by, updated_at)
+            VALUES ($1, FALSE, $2, CURRENT_TIMESTAMP)
+            RETURNING id, term_label, is_active;
+        `;
+        
+        const result = await pool.query(queryText, [term_label.trim(), req.user?.id]);
+        
+        return res.status(201).json({
+            message: 'Legislative term registered successfully.',
+            data: result.rows[0]
+        });
+    } catch (error: any) {
+        // Catch PostgreSQL Unique Violation constraint code
+        if (error.code === '23505') {
+            return res.status(400).json({ error: 'System Error: This legislative term label has already been registered.' });
+        }
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+
 export default router;

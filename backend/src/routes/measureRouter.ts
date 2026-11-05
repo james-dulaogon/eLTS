@@ -107,4 +107,22 @@ router.get('/public-track', async (req: express.Request, res: Response) => {
     }
 });
 
+router.get('/metrics', authenticateToken, authorizeRoles('Admin', 'Document_Clerk', 'Official'), async (req: express.Request, res: Response) => {
+    try {
+        const statsQuery = `
+            SELECT 
+                COUNT(*)::int AS total_received,
+                COUNT(CASE WHEN ordinance_resolution_number IS NULL THEN 1 END)::int AS pending_enactment,
+                COUNT(CASE WHEN ordinance_resolution_number IS NOT NULL THEN 1 END)::int AS total_enacted
+            FROM legislative_measures lm
+            INNER JOIN legislatures l ON lm.legislature_id = l.id
+            WHERE l.is_active = TRUE;
+        `;
+        const result = await pool.query(statsQuery);
+        return res.status(200).json(result.rows[0]);
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
 export default router;

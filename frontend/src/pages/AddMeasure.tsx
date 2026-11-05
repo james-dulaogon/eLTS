@@ -36,6 +36,9 @@ export default function AddMeasure() {
   const [committeeReport, setCommitteeReport] = useState<File | null>(null);
   const [scannedMeasure, setScannedMeasure] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedLegislatureId, setSelectedLegislatureId] = useState('');
+  const [legislaturesList, setLegislaturesList] = useState<Legislature[]>([]);
+
 
   // Pre-load active term requirements and official committee dropdown selectors
   useEffect(() => {
@@ -239,10 +242,28 @@ export default function AddMeasure() {
                 onChange={(e) => setCommitteeId(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
               >
-                <option value="">-- Choose Pre-registered Committee --</option>
+                <option value="">-- Choose Committee --</option>
                 {committees.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
+                7. Legislative Term
+              </label>
+              <select
+                required
+                value={selectedLegislatureId}
+                onChange={(e) => setSelectedLegislatureId(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              >
+                <option value="">-- Choose Legislative Term --</option>
+                {legislaturesList.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.term_label}
                   </option>
                 ))}
               </select>

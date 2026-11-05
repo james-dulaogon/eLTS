@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import pool from './config/db';
 
+
 const app = express();
 const PORT = process.env.PORT || 5001;
 
@@ -46,6 +47,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/committees', committeeRouter);
 app.use('/api/measures', measureRouter);
 app.use('/api/legislatures', sessionRouter);
+
 
 app.get('/api/health', (req: Request, res: Response) => {
     res.status(200).json({ status: 'healthy', timestamp: new Date() });
