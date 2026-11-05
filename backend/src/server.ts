@@ -5,7 +5,7 @@ import fs from 'fs';
 import pool from './config/db';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // ==========================================
 // 1. ROBUST CORS & PREFLIGHT CONFIGURATION

@@ -5,7 +5,7 @@ import { notify } from "../context/NotificationContext";
 const api = axios.create({
   baseURL:
     (import.meta as ImportMeta & { env: { VITE_API_BASE_URL?: string } }).env
-      .VITE_API_BASE_URL || "http://localhost:5000/api",
+      .VITE_API_BASE_URL || "http://localhost:5001/api",
   headers: {
     "Content-Type": "application/json",
   },

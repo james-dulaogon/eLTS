@@ -21,7 +21,7 @@ function requiredSetting(name: string, fallback?: string): string {
 }
 
 const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
+  host: process.env.DB_HOST || 'elts_postgres',
   port: parseInt(process.env.DB_PORT || '5432'),
   user: requiredSetting('DB_USER', process.env.POSTGRES_USER),
   password: requiredSetting('DB_PASSWORD', process.env.POSTGRES_PASSWORD),

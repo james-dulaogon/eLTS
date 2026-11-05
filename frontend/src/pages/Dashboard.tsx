@@ -203,12 +203,12 @@ export default function Dashboard() {
             <table className="w-full min-w-[1000px] text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-gray-200 text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  <th className="py-3 px-4 w-[110px]">1. Tracking No.</th>
-                  <th className="py-3 px-6 w-[320px]">2. Subject</th>
-                  <th className="py-3 px-4 w-[180px]">3. CR No. / Committee</th>
-                  <th className="py-3 px-4 w-[140px]">4. Hearing Date</th>
-                  <th className="py-3 px-4 w-[160px]">5. Ordinance/Res No.</th>
-                  <th className="py-3 px-4">6. Remarks</th>
+                  <th className="py-3 px-4 w-[110px]">Tracking No.</th>
+                  <th className="py-3 px-6 w-[320px]">Subject</th>
+                  <th className="py-3 px-4 w-[180px]">CR No. / Committee</th>
+                  <th className="py-3 px-4 w-[140px]">Hearing Date</th>
+                  <th className="py-3 px-4 w-[160px]">Ordinance/Res No.</th>
+                  <th className="py-3 px-4">Remarks</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 text-sm text-gray-900">
