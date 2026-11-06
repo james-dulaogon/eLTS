@@ -70,5 +70,14 @@ router.post('/', authenticateToken, authorizeRoles('Admin'), async (req: Authent
     }
 });
 
+// FETCH ALL LEGISLATIVE OPTIONS (For dropdown inclusion grids)
+router.get('/all', authenticateToken, async (req: express.Request, res: express.Response) => {
+    try {
+        const result = await pool.query('SELECT id, term_label, is_active FROM legislatures ORDER BY id DESC');
+        return res.status(200).json(result.rows);
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+});
 
 export default router;

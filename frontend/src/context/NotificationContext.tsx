@@ -67,7 +67,7 @@ function NotificationCard({
   useEffect(() => {
     const timeout = window.setTimeout(
       () => onDismiss(notification.id),
-      notification.type === "error" ? 7000 : 5000,
+      notification.type === "error" ? 3000 : 2000,
     );
     return () => window.clearTimeout(timeout);
   }, [notification.id, notification.type, onDismiss]);

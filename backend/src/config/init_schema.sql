@@ -54,8 +54,8 @@ CREATE TABLE IF NOT EXISTS legislative_measures (
     legislature_id INTEGER REFERENCES legislatures(id) NOT NULL,
 
     -- Storage system parameters for paths
-    doc_received_url TEXT NOT NULL,
-    committee_report_url TEXT NOT NULL,
+    doc_received_url TEXT DEFAULT NULL,
+    committee_report_url TEXT DEFAULT NULL,
     scanned_measure_url TEXT DEFAULT NULL,
 
     created_by INTEGER REFERENCES users(id),

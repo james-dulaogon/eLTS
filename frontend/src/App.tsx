@@ -10,7 +10,8 @@ import { NotificationProvider } from "./context/NotificationContext";
 import { ConfirmationProvider } from "./context/ConfirmationContext";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-import AddMeasure from "./pages/AddMeasure";
+import MeasureForm from "./pages/MeasureForm";
+import Settings from "./pages/Settings";
 
 // Custom security wrapper to protect internal tracking dashboards
 const ProtectedRoute = ({ children }: { children: React.JSX.Element }) => {
@@ -50,6 +51,17 @@ export default function App() {
             {/* Public Authentication Gate */}
             <Route path="/login" element={<Login />} />
 
+            {/* Fallback routing matrix defaults to dashboard or login page */}
+            <Route
+              path="*"
+              element={
+                <Navigate
+                  to={isAuthenticated ? "/dashboard" : "/login"}
+                  replace
+                />
+              }
+            />
+
             {/* High-Security Protected Core Matrix Dashboard */}
             <Route
               path="/dashboard"
@@ -59,22 +71,30 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            {/* Add Measure Form for New and Edit Operations */}
             <Route
               path="/dashboard/intake"
               element={
                 <ProtectedRoute>
-                  <AddMeasure />
+                  <MeasureForm />
                 </ProtectedRoute>
               }
             />
-            {/* Fallback routing matrix defaults to dashboard framework */}
             <Route
-              path="*"
+              path="/dashboard/edit/:id"
               element={
-                <Navigate
-                  to={isAuthenticated ? "/dashboard" : "/login"}
-                  replace
-                />
+                <ProtectedRoute>
+                  <MeasureForm />
+                </ProtectedRoute>
+              }
+            />
+            {/* System Settings Administrative Module */}
+            <Route
+              path="/dashboard/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
               }
             />
           </Routes>

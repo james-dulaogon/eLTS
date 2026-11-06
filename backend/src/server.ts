@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import pool from './config/db';
+import userRouter from './routes/userRouter';
 
 
 const app = express();
@@ -47,6 +48,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/committees', committeeRouter);
 app.use('/api/measures', measureRouter);
 app.use('/api/legislatures', sessionRouter);
+app.use('/api/users', userRouter);
 
 
 app.get('/api/health', (req: Request, res: Response) => {

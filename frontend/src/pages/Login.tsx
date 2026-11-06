@@ -119,7 +119,7 @@ export default function Login() {
               className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-semibold rounded-lg shadow-sm hover:shadow transition-all duration-200 mt-2 flex items-center justify-center space-x-2"
             >
               {isLoading ? (
-                <span>Verifying Configuration...</span>
+                <span>Logging in...</span>
               ) : (
                 <>
                   <span>Sign In &rarr;</span>

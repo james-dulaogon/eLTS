@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useAuthStore } from "../context/useAuthStore";
 import { useNotifications } from "../context/NotificationContext";
 import { useConfirmation } from "../context/ConfirmationContext";
 import AccountSettingsModal from "../components/AccountSettingsModal";
 import AdminSettingsModal from "../components/AdminSettingsModal";
+import UploadAttachmentModal from "../components/UploadAttachmentModal";
+import Settings from "./Settings";
 import api from "../services/api";
 
 interface LegislativeMeasure {
@@ -14,7 +16,7 @@ interface LegislativeMeasure {
   "Committee Hearing Date": string;
   "Ordinance/Resolution No.": string | null;
   Remarks: string;
-  doc_received_url: string;
+  doc_received_url: string | null;
   committee_report_url: string;
   scanned_measure_url: string | null;
 }
@@ -31,9 +33,12 @@ interface DashboardMetrics {
   total_enacted: number;
 }
 
+type AttachmentField = "doc_received" | "committee_report" | "scanned_measure";
+
 export default function Dashboard() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAdminSettingsOpen, setIsAdminSettingsOpen] = useState(false);
+  const [isSystemSettingsOpen, setIsSystemSettingsOpen] = useState(false);
   const { user, logout } = useAuthStore();
   const notify = useNotifications();
   const confirm = useConfirmation();
@@ -43,43 +48,59 @@ export default function Dashboard() {
     total_enacted: 0,
   });
   const [measures, setMeasures] = useState<LegislativeMeasure[]>([]);
-  const [legislatures, setLegislatures] = useState<Legislature[]>([]);
-  const [activeLegId, setActiveLegId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch matrix records and terms configuration simultaneously
+  {
+    /* Upload Attachment Modal State Management */
+  }
+  const [uploadModalState, setUploadModalState] = useState<{
+    isOpen: boolean;
+    measureId: number | null;
+    fieldName: "doc_received" | "committee_report" | "scanned_measure" | null;
+    fieldLabel: string;
+  }>({ isOpen: false, measureId: null, fieldName: null, fieldLabel: "" });
+
+  {
+    /* Dropdown menu */
+  }
+  const [activeDropdownId, setActiveDropdownId] = useState<number | null>(null);
+  const [dropdownCoords, setDropdownCoords] = useState<{
+    top: number;
+    right: number;
+    buttonTop: number;
+    buttonBottom: number;
+  } | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (activeDropdownId === null || !dropdownCoords || !dropdownRef.current) {
+      return;
+    }
+
+    const dropdownHeight = dropdownRef.current.getBoundingClientRect().height;
+    const belowTop = dropdownCoords.buttonBottom + 6;
+    const top =
+      belowTop + dropdownHeight > window.innerHeight - 8
+        ? Math.max(8, dropdownCoords.buttonTop - dropdownHeight - 6)
+        : belowTop;
+
+    setDropdownCoords((current) =>
+      current && current.top !== top ? { ...current, top } : current,
+    );
+  }, [activeDropdownId, dropdownCoords]);
+
   const fetchDashboardData = async () => {
     setIsLoading(true);
     try {
-      const [metricsRes, matrixRes, legRes] = await Promise.all([
+      // FIX: Decoupled and dropped the legislature endpoints completely from the dashboard loop
+      const [metricsRes, matrixRes] = await Promise.all([
         api.get("/measures/metrics"),
         api.get("/measures/matrix"),
-        api.get("/legislatures/current"), // Endpoint fetching active array
       ]);
+
       setMeasures(matrixRes.data);
       setMetrics(metricsRes.data);
-      // For demonstration setup fallback mock if database arrays are blank initially
-      if (legRes.data.length > 0) {
-        setLegislatures(legRes.data);
-        const active = legRes.data.find((l: Legislature) => l.is_active);
-        if (active) setActiveLegId(active.id);
-      } else {
-        const mockLegs = [
-          {
-            id: 1,
-            term_label: "22ND SANGGUNIANG BAYAN (2025-2028)",
-            is_active: true,
-          },
-          {
-            id: 2,
-            term_label: "21ST SANGGUNIANG BAYAN (2022-2025)",
-            is_active: false,
-          },
-        ];
-        setLegislatures(mockLegs);
-        setActiveLegId(1);
-      }
     } catch (err) {
       console.error("Failed to grab matrix records", err);
     } finally {
@@ -91,41 +112,35 @@ export default function Dashboard() {
     fetchDashboardData();
   }, []);
 
-  // Administrative Context Switching Handler with Security Gate Warn Locks
-  const handleLegislatureToggle = async (
-    targetId: number,
-    targetLabel: string,
+  const handleDirectFileUpload = async (
+    measureId: number,
+    fieldName: AttachmentField,
+    file: File,
   ) => {
-    if (user?.role !== "Admin") {
-      notify(
-        "Only system administrators can change the legislature.",
-        "warning",
-      );
+    if (file.type !== "application/pdf") {
+      notify("Only PDF documents can be uploaded.", "error");
       return;
     }
-    if (targetId === activeLegId) return;
 
-    const confirmSwitch = await confirm({
-      title: "Switch active legislature?",
-      message: `You are about to change the active term to "${targetLabel}". This will change the legislature used to filter active data.`,
-      confirmLabel: "Switch legislature",
-      cancelLabel: "Keep current term",
-    });
+    if (file.size > 20 * 1024 * 1024) {
+      notify("The file cannot exceed 20MB.", "error");
+      return;
+    }
 
-    if (confirmSwitch) {
-      try {
-        await api.put("/legislatures/switch", {
-          targetLegislatureId: targetId,
-        });
-        setActiveLegId(targetId);
-        // Refresh table context elements instantly
-        fetchDashboardData();
-      } catch (err: any) {
-        notify(
-          err.response?.data?.error?.message || "Failed to switch legislature.",
-          "error",
-        );
-      }
+    const formData = new FormData();
+    formData.append("id", String(measureId));
+    formData.append(fieldName, file);
+
+    try {
+      await api.put("/measures/upload-single-attachment", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      notify("Attachment uploaded successfully.", "success");
+      await fetchDashboardData();
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Please try again.";
+      notify(`Attachment upload failed: ${message}`, "error");
     }
   };
 
@@ -165,15 +180,14 @@ export default function Dashboard() {
             eLegislative Tracking System
           </h1>
         </div>
-
+        {/* 2. SYSTEM SETTINGS CONTROLS */}
         <div className="flex items-center space-x-4">
-          <div className="hidden md:block">
-            {user?.role === "Admin" && (
-              <button
-                onClick={() => setIsAdminSettingsOpen(true)}
-                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl border border-gray-100 bg-white transition-all duration-200 shadow-sm"
-                title="Open Admin System Registry Settings"
-              >
+          {user?.role === "Admin" && (
+            <button
+              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl border border-gray-100 bg-white transition-all duration-200 shadow-sm"
+              title="Open System Settings"
+            >
+              <a href="/dashboard/settings">
                 <svg
                   xmlns="http://w3.org"
                   fill="none"
@@ -193,8 +207,11 @@ export default function Dashboard() {
                     d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
                   />
                 </svg>
-              </button>
-            )}
+              </a>
+            </button>
+          )}
+
+          <div className="hidden md:block">
             <button
               onClick={() => setIsSettingsOpen(true)}
               className="flex items-center space-x-3 p-1.5 pr-3 rounded-xl border border-gray-100 bg-white hover:border-blue-200 hover:shadow-sm focus:outline-none transition-all duration-200 text-left group"
@@ -222,7 +239,6 @@ export default function Dashboard() {
                 </span>
               </div>
 
-              {/* Decorative Dropdown Chevron Indicator */}
               <svg
                 xmlns="http://w3.org"
                 fill="none"
@@ -239,6 +255,7 @@ export default function Dashboard() {
               </svg>
             </button>
           </div>
+          {/* Logout Button */}
           <button
             onClick={logout}
             className="text-sm font-medium text-gray-500 hover:text-red-600 border border-gray-200 hover:border-red-200 px-3 py-1.5 rounded-lg transition"
@@ -250,37 +267,6 @@ export default function Dashboard() {
 
       {/* MAIN CONTAINER GRID LAYOUT */}
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* 2. ADMIN PANEL CONFIGS SECTION */}
-        {/* {user?.role === 'Admin' && (
-          <div className="bg-white p-4 sm:p-6 rounded-xl border border-gray-200 shadow-sm space-y-3">
-            <div>
-              <h2 className="text-base font-bold text-gray-900">Administration Console — Legislature Context Selection</h2>
-              <p className="text-xs text-gray-500">Switch active focus fields to filter workspace items by operating year profiles.</p>
-            </div>
-            <div className="flex flex-wrap gap-4 pt-1">
-              {legislatures.map((leg) => (
-                <label
-                  key={leg.id}
-                  className={`flex items-center px-4 py-2.5 rounded-lg border cursor-pointer text-sm font-medium transition ${
-                    activeLegId === leg.id
-                      ? 'border-blue-600 bg-blue-50/50 text-blue-700'
-                      : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="legislature-context"
-                    checked={activeLegId === leg.id}
-                    onChange={() => handleLegislatureToggle(leg.id, leg.term_label)}
-                    className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500 mr-3"
-                  />
-                  {leg.term_label}
-                </label>
-              ))}
-            </div>
-          </div>
-        )} */}
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all duration-200 hover:border-blue-600 hover:shadow-md group">
             <p className="text-xs font-bold uppercase tracking-wider text-gray-400 group-hover:text-blue-500 transition-colors">
@@ -346,52 +332,68 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* 4. CORE DATA TABLE MATRIX — 6 EXACT RESPONSIVE COLUMNS */}
+        {/* 4. CORE DATA TABLE MATRIX */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-left border-collapse">
-              <thead>
+          <div className="md:overflow-x-auto">
+            <table className="block w-full min-w-0 text-left border-collapse md:table md:min-w-[1000px]">
+              <thead className="hidden md:table-header-group">
                 <tr className="bg-slate-50 border-b border-gray-200 text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  <th className="py-3 px-4 w-[110px]">Tracking No.</th>
-                  <th className="py-3 px-6 w-[320px]">Subject</th>
-                  <th className="py-3 px-4 w-[180px]">CR No. / Committee</th>
-                  <th className="py-3 px-4 w-[140px]">Hearing Date</th>
-                  <th className="py-3 px-4 w-[160px]">Ordinance/Res No.</th>
-                  <th className="py-3 px-4">Remarks</th>
+                  <th className="py-3 px-4 w-[110px] text-center">
+                    Tracking No.
+                  </th>
+                  <th className="py-3 px-6 w-[320px] text-center">Subject</th>
+                  <th className="py-3 px-4 w-[180px] text-center">
+                    CR No. / Committee
+                  </th>
+                  <th className="py-3 px-4 w-[140px] text-center">
+                    Hearing Date
+                  </th>
+                  <th className="py-3 px-4 w-[160px] text-center">
+                    Ordinance/Res No.
+                  </th>
+                  <th className="py-3 px-4 text-center">Remarks</th>
+                  <th className="py-3.5 px-4 text-center w-[120px]">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 text-sm text-gray-900">
+              <tbody className="block space-y-3 p-3 text-sm text-gray-900 md:table-row-group md:space-y-0 md:divide-y md:divide-gray-200 md:p-0">
                 {isLoading ? (
-                  <tr>
+                  <tr className="block md:table-row">
                     <td
-                      colSpan={6}
-                      className="text-center py-12 text-gray-500 font-medium"
+                      colSpan={7}
+                      className="block text-center py-12 text-gray-500 font-medium md:table-cell"
                     >
-                      Streaming records safely from Synology Storage Array...
+                      Streaming records safely from Server...
                     </td>
                   </tr>
                 ) : filteredMeasures.length === 0 ? (
-                  <tr>
+                  <tr className="block md:table-row">
                     <td
-                      colSpan={6}
-                      className="text-center py-12 text-gray-500 font-light"
+                      colSpan={7}
+                      className="block text-center py-12 text-gray-500 font-light md:table-cell"
                     >
-                      No matching tracking elements located in this legislature
-                      slice context frame.
+                      No records found matching the keyword you type.
                     </td>
                   </tr>
                 ) : (
                   filteredMeasures.map((measure) => (
                     <tr
                       key={measure.id}
-                      className="hover:bg-slate-50/70 transition-colors"
+                      className="block rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-colors md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none md:hover:bg-slate-50/70"
                     >
-                      <td className="py-4 px-4 font-semibold text-blue-700">
+                      {/* Tracking No. */}
+                      <td className="block break-words py-2 px-1 font-semibold text-blue-700 md:table-cell md:py-4 md:px-4">
                         {measure["Tracking No."]}
                       </td>
-                      <td className="py-4 px-6">{measure.Subject}</td>
-                      <td className="py-4 px-4">{measure["CR NO."]}</td>
-                      <td className="py-4 px-4">
+                      {/* Subject */}
+                      <td className="block break-words py-2 px-1 md:table-cell md:py-4 md:px-6">
+                        {measure.Subject}
+                      </td>
+                      {/* CR No. / Committee */}
+                      <td className="block break-words py-2 px-1 md:table-cell md:py-4 md:px-4">
+                        {measure["CR NO."]}
+                      </td>
+                      {/* Committee Hearing Date */}
+                      <td className="block py-2 px-1 md:table-cell md:py-4 md:px-4">
                         {measure["Committee Hearing Date"]
                           ? new Date(
                               measure["Committee Hearing Date"],
@@ -402,10 +404,12 @@ export default function Dashboard() {
                             })
                           : "—"}
                       </td>
-                      <td className="py-4 px-4">
+                      {/* Ordinance/Resolution No. */}
+                      <td className="block break-words py-2 px-1 md:table-cell md:py-4 md:px-4">
                         {measure["Ordinance/Resolution No."] || "—"}
                       </td>
-                      <td className="py-4 px-4">
+                      {/* Remarks */}
+                      <td className="block break-words py-2 px-1 md:table-cell md:py-4 md:px-4">
                         <p>{measure.Remarks || "—"}</p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           <button
@@ -437,6 +441,146 @@ export default function Dashboard() {
                           </button>
                         </div>
                       </td>
+                      {/* Dropdown Menu Options */}
+                      <td className="relative block py-2 px-1 text-right md:table-cell md:py-4 md:px-4 md:text-center">
+                        <div className="inline-block text-left">
+                          <button
+                            onClick={(e) => {
+                              if (activeDropdownId === measure.id) {
+                                setActiveDropdownId(null);
+                                setDropdownCoords(null);
+                              } else {
+                                const rect =
+                                  e.currentTarget.getBoundingClientRect();
+                                setDropdownCoords({
+                                  top: rect.bottom + 6,
+                                  right: window.innerWidth - rect.right,
+                                  buttonTop: rect.top,
+                                  buttonBottom: rect.bottom,
+                                });
+                                setActiveDropdownId(measure.id);
+                              }
+                            }}
+                            className="inline-flex justify-center w-full rounded-lg border border-gray-200 shadow-sm px-3 py-1.5 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-150"
+                          >
+                            Options
+                            <svg
+                              className="ml-1.5 -mr-0.5 h-3.5 w-3.5 text-gray-400"
+                              xmlns="http://w3.org"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                              />
+                            </svg>
+                          </button>
+
+                          {activeDropdownId === measure.id &&
+                            dropdownCoords && (
+                              <React.Fragment>
+                                {/* Transparent backdrop layer overlay hook to easily close dropdown when clicking anywhere outside */}
+                                <div
+                                  className="fixed inset-0 z-40"
+                                  onClick={() => {
+                                    setActiveDropdownId(null);
+                                    setDropdownCoords(null);
+                                  }}
+                                />
+                                <div
+                                  ref={dropdownRef}
+                                  className="fixed w-48 rounded-xl shadow-xl bg-white ring-1 ring-black ring-opacity-5 z-50 divide-y divide-gray-100 focus:outline-none border border-gray-100 animate-fade-in text-left"
+                                  style={{
+                                    top: `${dropdownCoords.top}px`,
+                                    right: `${dropdownCoords.right}px`,
+                                    maxHeight: "calc(100vh - 16px)",
+                                    overflowY: "auto",
+                                  }}
+                                >
+                                  {/* PRIMARY ROUTE: EDIT DATA */}
+                                  {(user?.role === "Admin" ||
+                                    user?.role === "Document_Clerk") && (
+                                    <div className="py-1">
+                                      <button
+                                        onClick={() => {
+                                          setActiveDropdownId(null);
+                                          window.location.href = `/dashboard/edit/${measure.id}`;
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium transition"
+                                      >
+                                        Edit
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {/* STREAM SECTION: SECURE CLOUD DISPATCH CHANNELS */}
+                                  <div className="py-1">
+                                    <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 font-medium transition">
+                                      Upload Attachments
+                                    </label>
+                                    <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium cursor-pointer transition">
+                                      ➜] Document Rec.
+                                      <input
+                                        accept=".pdf"
+                                        className="hidden"
+                                        onClick={() => {
+                                          setUploadModalState({
+                                            isOpen: true,
+                                            measureId: measure.id,
+                                            fieldName: "doc_received",
+                                            fieldLabel: "Documents Received",
+                                          });
+                                          setActiveDropdownId(null);
+                                          setDropdownCoords(null);
+                                        }}
+                                      />
+                                    </label>
+
+                                    <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium cursor-pointer transition">
+                                      ➜] Committee Rep.
+                                      <input
+                                        accept=".pdf"
+                                        className="hidden"
+                                        onClick={() => {
+                                          setUploadModalState({
+                                            isOpen: true,
+                                            measureId: measure.id,
+                                            fieldName: "committee_report",
+                                            fieldLabel: "Committee Report",
+                                          });
+                                          setActiveDropdownId(null);
+                                          setDropdownCoords(null);
+                                        }}
+                                      />
+                                    </label>
+
+                                    <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-emerald-600 font-medium cursor-pointer transition">
+                                      ➜] Enacted Measure
+                                      <input
+                                        accept=".pdf"
+                                        className="hidden"
+                                        onClick={() => {
+                                          setUploadModalState({
+                                            isOpen: true,
+                                            measureId: measure.id,
+                                            fieldName: "scanned_measure",
+                                            fieldLabel: "Enacted Measure",
+                                          });
+                                          setActiveDropdownId(null);
+                                          setDropdownCoords(null);
+                                        }}
+                                      />
+                                    </label>
+                                  </div>
+                                </div>
+                              </React.Fragment>
+                            )}
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -452,6 +596,21 @@ export default function Dashboard() {
       <AdminSettingsModal
         isOpen={isAdminSettingsOpen}
         onClose={() => setIsAdminSettingsOpen(false)}
+      />
+      <UploadAttachmentModal
+        isOpen={uploadModalState.isOpen}
+        measureId={uploadModalState.measureId}
+        fieldName={uploadModalState.fieldName}
+        fieldLabel={uploadModalState.fieldLabel}
+        onClose={() =>
+          setUploadModalState({
+            isOpen: false,
+            measureId: null,
+            fieldName: null,
+            fieldLabel: "",
+          })
+        }
+        onUploadSuccess={fetchDashboardData} // Automatically triggers data re-fetch on success
       />
     </div>
   );
