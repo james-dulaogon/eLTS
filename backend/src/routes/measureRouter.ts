@@ -102,18 +102,17 @@ router.get("/public-track", async (req: express.Request, res: Response) => {
 
   try {
     const publicQuery = `
-            SELECT
-                lm.tracking_number AS "Tracking No.",
-                lm.subject_text AS "Subject",
-                lm.committee_hearing_date AS "Last Action Date",
-                CASE
-                    WHEN lm.ordinance_resolution_number IS NOT NULL THEN 'Enacted / Passed'
-                    ELSE 'In Committee Review'
-                END AS "Current Status",
-                lm.remarks AS "Progress Timeline / Remarks"
+          SELECT
+            lm.tracking_number AS "Tracking No.",
+            lm.subject_text AS "Subject",
+            lm.committee_hearing_date AS "Last Action Date",
+            CASE
+            WHEN lm.ordinance_resolution_number IS NOT NULL THEN 'Enacted / Passed'
+            ELSE 'In Committee Review'
+            END AS "Current Status",
+            lm.remarks AS "Progress Timeline / Remarks"
             FROM legislative_measures lm
-            WHERE lm.tracking_number = $1
-            LIMIT 1;
+          WHERE lm.tracking_number LIKE '%' || $1 || '%';
         `;
     const result = await pool.query(publicQuery, [tn.toString()]);
 
@@ -208,12 +207,10 @@ router.get(
 
     // Reject non-numeric route parameters to block SQL query vulnerabilities
     if (!id || isNaN(Number(id))) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Validation Error: Invalid database record primary identifier parameter.",
-        });
+      return res.status(400).json({
+        error:
+          "Validation Error: Invalid database record primary identifier parameter.",
+      });
     }
 
     try {
@@ -236,12 +233,10 @@ router.get(
       const result = await pool.query(metadataQuery, [id]);
 
       if (result.rows.length === 0) {
-        return res
-          .status(404)
-          .json({
-            error:
-              "Data Lookup Fault: No active measure profile matches that row location.",
-          });
+        return res.status(404).json({
+          error:
+            "Data Lookup Fault: No active measure profile matches that row location.",
+        });
       }
 
       // Delivers only the structured metadata parameters to the polymorphic React entry page
@@ -262,12 +257,10 @@ router.put(
 
     // Verify record identifier parameters
     if (!id || isNaN(Number(id))) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Validation Error: Invalid database record primary identifier parameter.",
-        });
+      return res.status(400).json({
+        error:
+          "Validation Error: Invalid database record primary identifier parameter.",
+      });
     }
 
     const {
@@ -290,12 +283,10 @@ router.put(
       !committee_hearing_date ||
       !legislature_id
     ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Validation Error: Missing mandatory legislative document metadata fields.",
-        });
+      return res.status(400).json({
+        error:
+          "Validation Error: Missing mandatory legislative document metadata fields.",
+      });
     }
 
     try {
@@ -329,12 +320,10 @@ router.put(
       const result = await pool.query(updateQuery, queryParams);
 
       if (result.rows.length === 0) {
-        return res
-          .status(404)
-          .json({
-            error:
-              "Data Persist Fault: Target legislative document row could not be located.",
-          });
+        return res.status(404).json({
+          error:
+            "Data Persist Fault: Target legislative document row could not be located.",
+        });
       }
 
       return res.status(200).json({
@@ -344,12 +333,10 @@ router.put(
     } catch (error: any) {
       // Check for structural database constraints (e.g. unique tracking number clashes)
       if (error.code === "23505") {
-        return res
-          .status(400)
-          .json({
-            error:
-              "System Constraint Failure: This tracking number configuration is already assigned.",
-          });
+        return res.status(400).json({
+          error:
+            "System Constraint Failure: This tracking number configuration is already assigned.",
+        });
       }
       return res.status(500).json({ error: error.message });
     }

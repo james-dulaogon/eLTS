@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secure_local_only_jwt_secret_key_string';
-const IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes session activity lock
+const IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 10 minutes session activity lock
 
 // Extend express Request interface locally to bundle verified payload parameters
 export interface AuthenticatedRequest extends Request {
@@ -53,7 +53,7 @@ export const authenticateToken = (req: AuthenticatedRequest, res: Response, next
 
         next();
     } catch (error) {
-        return res.status(403).json({ error: { message: 'Access Denied: Invalid or expired token profile.' } });
+        return res.status(401).json({ error: { message: 'Access Denied: Invalid or expired token profile.' } });
     }
 };
 

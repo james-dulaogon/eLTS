@@ -6,12 +6,16 @@ import {
   Navigate,
 } from "react-router-dom";
 import { useAuthStore } from "./context/useAuthStore";
-import { NotificationProvider } from "./context/NotificationContext";
+import {
+  NotificationProvider,
+  notify,
+} from "./context/NotificationContext";
 import { ConfirmationProvider } from "./context/ConfirmationContext";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import MeasureForm from "./pages/MeasureForm";
 import Settings from "./pages/Settings";
+import PublicTrack from './pages/PublicTrack';
 
 // Custom security wrapper to protect internal tracking dashboards
 const ProtectedRoute = ({ children }: { children: React.JSX.Element }) => {
@@ -20,7 +24,47 @@ const ProtectedRoute = ({ children }: { children: React.JSX.Element }) => {
 };
 
 export default function App() {
-  const { isAuthenticated, updateActivity } = useAuthStore();
+  const { isAuthenticated, token, logout, updateActivity } = useAuthStore();
+
+  // Keep the client session in sync with the JWT expiration, even without API traffic.
+  useEffect(() => {
+    if (!token) return;
+
+    try {
+      const payload = token.split(".")[1];
+      if (!payload) {
+        logout();
+        return;
+      }
+
+      const normalizedPayload = payload
+        .replace(/-/g, "+")
+        .replace(/_/g, "/")
+        .padEnd(Math.ceil(payload.length / 4) * 4, "=");
+      const claims = JSON.parse(window.atob(normalizedPayload)) as {
+        exp?: number;
+      };
+      if (typeof claims.exp !== "number") {
+        logout();
+        return;
+      }
+
+      const remainingTime = claims.exp * 1000 - Date.now();
+      if (remainingTime <= 0) {
+        notify("Your session has expired. Please sign in again.", "warning");
+        logout();
+        return;
+      }
+
+      const expirationTimer = window.setTimeout(() => {
+        notify("Your session has expired. Please sign in again.", "warning");
+        logout();
+      }, remainingTime);
+      return () => window.clearTimeout(expirationTimer);
+    } catch {
+      logout();
+    }
+  }, [token, logout]);
 
   // Active user interaction listener system to monitor the 10-minute idle session bounds
   useEffect(() => {
@@ -97,6 +141,7 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="/public-track" element={<PublicTrack />} />
           </Routes>
         </Router>
       </ConfirmationProvider>

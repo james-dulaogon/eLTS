@@ -7,7 +7,7 @@ const router = express.Router();
 // FETCH REGISTRY (Accessible to Admin, Clerks, and Officials)
 router.get('/', authenticateToken, authorizeRoles('Admin', 'Document_Clerk', 'Official'), async (req: express.Request, res: Response) => {
     try {
-        const result = await pool.query('SELECT id, name FROM committees ORDER BY name ASC');
+        const result = await pool.query('SELECT id, name FROM committees ORDER BY name DESC');
         return res.status(200).json(result.rows);
     } catch (error: any) {
         return res.status(500).json({ error: error.message });
