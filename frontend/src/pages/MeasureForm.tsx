@@ -119,8 +119,8 @@ export default function MeasureForm() {
               className={`w-2.5 h-6 rounded-sm inline-block ${isEditMode ? "bg-amber-500" : "bg-blue-600"}`}
             />
             {isEditMode
-              ? `Modify Record Elements — Tracking Target [${trackingNumber}]`
-              : "Document Intake — Add New Measure"}
+              ? `Edit Document Received [${trackingNumber}]`
+              : "New Document Received"}
           </h1>
           <button
             onClick={() => navigate("/dashboard")}
@@ -212,7 +212,7 @@ export default function MeasureForm() {
               <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                 6. Ordinance / Resolution No.{" "}
                 <span className="lowercase font-normal text-gray-400">
-                  (nullable)
+                  (optional)
                 </span>
               </label>
               <input
@@ -227,7 +227,7 @@ export default function MeasureForm() {
 
           <div>
             <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-              7. Subject Content Description
+              7. Title/Description of the Document Received
             </label>
             <textarea
               required
@@ -240,7 +240,7 @@ export default function MeasureForm() {
 
           <div>
             <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-              8. Remarks Timeline Log History
+              8. Remarks
             </label>
             <textarea
               rows={2}

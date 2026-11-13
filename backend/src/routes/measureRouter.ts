@@ -9,12 +9,6 @@ import {
 
 const router = express.Router();
 
-const eltsUploadFields = uploadEngine.fields([
-  { name: "doc_received", maxCount: 1 },
-  { name: "committee_report", maxCount: 1 },
-  { name: "scanned_measure", maxCount: 1 },
-]);
-
 // 1. HIGH-SPEED INTERNAL QUERY DASHBOARD (Admin, Clerks, Officials)
 router.get(
   "/matrix",

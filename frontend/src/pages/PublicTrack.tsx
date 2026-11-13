@@ -58,7 +58,7 @@ export default function PublicTrack() {
             eLTS
           </div>
           <h1 className="text-base font-bold text-gray-900">
-            Sangguniang Bayan Application Tracking Portal
+            Tracking Portal
           </h1>
         </div>
         <a
@@ -79,7 +79,7 @@ export default function PublicTrack() {
             </h2>
             <p className="text-xs text-gray-500 font-light leading-relaxed">
               Enter your assigned Tracking Number (TN NO.) below to instantly
-              monitor the legislative journey and status of your document.
+              monitor the legislative actions and status of your document.
             </p>
           </div>
 
@@ -161,8 +161,8 @@ export default function PublicTrack() {
                     Public Access Policy
                   </h4>
                   <p className="mt-1 text-xs text-gray-500 font-light leading-normal">
-                    To claim official scanned ordinance/resolution documents,
-                    present this verified tracking number to your Sangguniang
+                    To get a official copy of ordinance/resolution documents,
+                    present tracking number to your Sangguniang
                     Bayan office.
                   </p>
                 </div>
@@ -194,7 +194,7 @@ export default function PublicTrack() {
                       if (timelineLogs.length === 0) {
                         return (
                           <p className="text-xs italic text-gray-400 font-light pl-2">
-                            No milestones or tracking actions have been
+                            No taken actions have been
                             officially recorded yet.
                           </p>
                         );
@@ -260,7 +260,7 @@ export default function PublicTrack() {
                                   }`}
                                 >
                                   {isLatest
-                                    ? "💡 Latest Milestone Status Action"
+                                    ? "💡 Latest Status Action"
                                     : `Step ${index + 1}`}
                                 </span>
 
@@ -275,7 +275,7 @@ export default function PublicTrack() {
                                           : "bg-blue-600 text-white"
                                     }`}
                                   >
-                                    Active Status Frame
+                                    Active Status Update
                                   </span>
                                 )}
                               </div>

@@ -50,6 +50,8 @@ export default function Dashboard() {
   const [measures, setMeasures] = useState<LegislativeMeasure[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   {
     /* Upload Attachment Modal State Management */
@@ -102,7 +104,7 @@ export default function Dashboard() {
       setMeasures(matrixRes.data);
       setMetrics(metricsRes.data);
     } catch (err) {
-      console.error("Failed to grab matrix records", err);
+      console.error("Failed to grab records", err);
     } finally {
       setIsLoading(false);
     }
@@ -112,43 +114,47 @@ export default function Dashboard() {
     fetchDashboardData();
   }, []);
 
-  const handleDirectFileUpload = async (
-    measureId: number,
-    fieldName: AttachmentField,
-    file: File,
-  ) => {
-    if (file.type !== "application/pdf") {
-      notify("Only PDF documents can be uploaded.", "error");
-      return;
-    }
+  useEffect(() => {
+  setCurrentPage(1);
+  }, [searchQuery]);
 
-    if (file.size > 20 * 1024 * 1024) {
-      notify("The file cannot exceed 20MB.", "error");
-      return;
-    }
+  // const handleDirectFileUpload = async (
+  //   measureId: number,
+  //   fieldName: AttachmentField,
+  //   file: File,
+  // ) => {
+  //   if (file.type !== "application/pdf") {
+  //     notify("Only PDF documents can be uploaded.", "error");
+  //     return;
+  //   }
 
-    const formData = new FormData();
-    formData.append("id", String(measureId));
-    formData.append(fieldName, file);
+  //   if (file.size > 20 * 1024 * 1024) {
+  //     notify("The file cannot exceed 20MB.", "error");
+  //     return;
+  //   }
 
-    try {
-      await api.put("/measures/upload-single-attachment", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      notify("Attachment uploaded successfully.", "success");
-      await fetchDashboardData();
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Please try again.";
-      notify(`Attachment upload failed: ${message}`, "error");
-    }
-  };
+  //   const formData = new FormData();
+  //   formData.append("id", String(measureId));
+  //   formData.append(fieldName, file);
+
+  //   try {
+  //     await api.put("/measures/upload-single-attachment", formData, {
+  //       headers: { "Content-Type": "multipart/form-data" },
+  //     });
+  //     notify("Attachment uploaded successfully.", "success");
+  //     await fetchDashboardData();
+  //   } catch (error: unknown) {
+  //     const message =
+  //       error instanceof Error ? error.message : "Please try again.";
+  //     notify(`Attachment upload failed: ${message}`, "error");
+  //   }
+  // };
 
   // Safe file viewing click dispatch pipeline
   const viewDocument = (urlPath: string | null) => {
     if (!urlPath) {
       notify(
-        "No scanned copy has been uploaded for this workflow state yet.",
+        "No scanned copy has been uploaded for this measure yet.",
         "info",
       );
       return;
@@ -156,7 +162,7 @@ export default function Dashboard() {
     // Resolves dynamically to the Synology backend static download upload mounts
     const fullUrl = urlPath.startsWith("http")
       ? urlPath
-      : `http://localhost:5000${urlPath}`;
+      : `http://localhost:5001${urlPath}`;
     window.open(fullUrl, "_blank", "noopener,noreferrer");
   };
 
@@ -167,6 +173,12 @@ export default function Dashboard() {
       m.Subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
       m["CR NO."].toLowerCase().includes(searchQuery.toLowerCase()),
   );
+
+  const totalPages = Math.ceil(filteredMeasures.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentMeasures = filteredMeasures.slice(indexOfFirstItem, indexOfLastItem);
+
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
@@ -238,21 +250,6 @@ export default function Dashboard() {
                   {user?.role?.replace("_", " ")}
                 </span>
               </div>
-
-              <svg
-                xmlns="http://w3.org"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2.5}
-                stroke="currentColor"
-                className="w-3 h-3 text-gray-300 group-hover:text-blue-500 transition-colors ml-1"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                />
-              </svg>
             </button>
           </div>
           {/* Logout Button */}
@@ -327,7 +324,7 @@ export default function Dashboard() {
               href="/dashboard/intake"
               className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg shadow-sm text-center transition"
             >
-              + Add New Measure
+              + Add Document Received
             </a>
           )}
         </div>
@@ -357,28 +354,22 @@ export default function Dashboard() {
               </thead>
               <tbody className="block space-y-3 p-3 text-sm text-gray-900 md:table-row-group md:space-y-0 md:divide-y md:divide-gray-200 md:p-0">
                 {isLoading ? (
-                  <tr className="block md:table-row">
-                    <td
-                      colSpan={7}
-                      className="block text-center py-12 text-gray-500 font-medium md:table-cell"
-                    >
-                      Streaming records safely from Server...
+                  <tr>
+                    <td colSpan={7} className="text-center py-10 text-gray-400">
+                      Loading tracking documents...
                     </td>
                   </tr>
-                ) : filteredMeasures.length === 0 ? (
-                  <tr className="block md:table-row">
-                    <td
-                      colSpan={7}
-                      className="block text-center py-12 text-gray-500 font-light md:table-cell"
-                    >
-                      No records found matching the keyword you type.
+                ) : currentMeasures.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-10 text-gray-400">
+                      No matching legislative records found.
                     </td>
                   </tr>
                 ) : (
-                  filteredMeasures.map((measure) => (
+                  currentMeasures.map((measure) => (
                     <tr
                       key={measure.id}
-                      className="block rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-colors md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none md:hover:bg-slate-50/70"
+                      className="block rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-colors md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none md:hover:bg-slate-50/70 text-xs text-justify"
                     >
                       {/* Tracking No. */}
                       <td className="block break-words py-2 px-1 font-semibold text-blue-700 md:table-cell md:py-4 md:px-4">
@@ -480,105 +471,104 @@ export default function Dashboard() {
                             </svg>
                           </button>
 
-                          {activeDropdownId === measure.id &&
-                            dropdownCoords && (
-                              <React.Fragment>
-                                {/* Transparent backdrop layer overlay hook to easily close dropdown when clicking anywhere outside */}
-                                <div
-                                  className="fixed inset-0 z-40"
-                                  onClick={() => {
-                                    setActiveDropdownId(null);
-                                    setDropdownCoords(null);
-                                  }}
-                                />
-                                <div
-                                  ref={dropdownRef}
-                                  className="fixed w-48 rounded-xl shadow-xl bg-white ring-1 ring-black ring-opacity-5 z-50 divide-y divide-gray-100 focus:outline-none border border-gray-100 animate-fade-in text-left"
-                                  style={{
-                                    top: `${dropdownCoords.top}px`,
-                                    right: `${dropdownCoords.right}px`,
-                                    maxHeight: "calc(100vh - 16px)",
-                                    overflowY: "auto",
-                                  }}
-                                >
-                                  {/* PRIMARY ROUTE: EDIT DATA */}
-                                  {(user?.role === "Admin" ||
-                                    user?.role === "Document_Clerk") && (
-                                    <div className="py-1">
-                                      <button
-                                        onClick={() => {
-                                          setActiveDropdownId(null);
-                                          window.location.href = `/dashboard/edit/${measure.id}`;
-                                        }}
-                                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium transition"
-                                      >
-                                        Edit
-                                      </button>
-                                    </div>
-                                  )}
-
-                                  {/* STREAM SECTION: SECURE CLOUD DISPATCH CHANNELS */}
+                          {activeDropdownId === measure.id && dropdownCoords && (
+                            <React.Fragment>
+                              {/* Transparent backdrop layer overlay hook to easily close dropdown when clicking anywhere outside */}
+                              <div
+                                className="fixed inset-0 z-40"
+                                onClick={() => {
+                                  setActiveDropdownId(null);
+                                  setDropdownCoords(null);
+                                }}
+                              />
+                              <div
+                                ref={dropdownRef}
+                                className="fixed w-48 rounded-xl shadow-xl bg-white ring-1 ring-black ring-opacity-5 z-50 divide-y divide-gray-100 focus:outline-none border border-gray-100 animate-fade-in text-left"
+                                style={{
+                                  top: `${dropdownCoords.top}px`,
+                                  right: `${dropdownCoords.right}px`,
+                                  maxHeight: "calc(100vh - 16px)",
+                                  overflowY: "auto",
+                                }}
+                              >
+                                {/* PRIMARY ROUTE: EDIT DATA */}
+                                {(user?.role === "Admin" ||
+                                  user?.role === "Document_Clerk") && (
                                   <div className="py-1">
-                                    <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 font-medium transition">
-                                      Upload Attachments
-                                    </label>
-                                    <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium cursor-pointer transition">
-                                      ➜] Document Rec.
-                                      <input
-                                        accept=".pdf"
-                                        className="hidden"
-                                        onClick={() => {
-                                          setUploadModalState({
-                                            isOpen: true,
-                                            measureId: measure.id,
-                                            fieldName: "doc_received",
-                                            fieldLabel: "Documents Received",
-                                          });
-                                          setActiveDropdownId(null);
-                                          setDropdownCoords(null);
-                                        }}
-                                      />
-                                    </label>
-
-                                    <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium cursor-pointer transition">
-                                      ➜] Committee Rep.
-                                      <input
-                                        accept=".pdf"
-                                        className="hidden"
-                                        onClick={() => {
-                                          setUploadModalState({
-                                            isOpen: true,
-                                            measureId: measure.id,
-                                            fieldName: "committee_report",
-                                            fieldLabel: "Committee Report",
-                                          });
-                                          setActiveDropdownId(null);
-                                          setDropdownCoords(null);
-                                        }}
-                                      />
-                                    </label>
-
-                                    <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-emerald-600 font-medium cursor-pointer transition">
-                                      ➜] Enacted Measure
-                                      <input
-                                        accept=".pdf"
-                                        className="hidden"
-                                        onClick={() => {
-                                          setUploadModalState({
-                                            isOpen: true,
-                                            measureId: measure.id,
-                                            fieldName: "scanned_measure",
-                                            fieldLabel: "Enacted Measure",
-                                          });
-                                          setActiveDropdownId(null);
-                                          setDropdownCoords(null);
-                                        }}
-                                      />
-                                    </label>
+                                    <button
+                                      onClick={() => {
+                                        setActiveDropdownId(null);
+                                        window.location.href = `/dashboard/edit/${measure.id}`;
+                                      }}
+                                      className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium transition"
+                                    >
+                                      Edit
+                                    </button>
                                   </div>
+                                )}
+
+                                {/* STREAM SECTION: SECURE CLOUD DISPATCH CHANNELS */}
+                                <div className="py-1">
+                                  <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 font-medium transition">
+                                    Upload Attachments
+                                  </label>
+                                  <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium cursor-pointer transition">
+                                    ➜] Document Rec.
+                                    <input
+                                      accept=".pdf"
+                                      className="hidden"
+                                      onClick={() => {
+                                        setUploadModalState({
+                                          isOpen: true,
+                                          measureId: measure.id,
+                                          fieldName: "doc_received",
+                                          fieldLabel: "Documents Received",
+                                        });
+                                        setActiveDropdownId(null);
+                                        setDropdownCoords(null);
+                                      }}
+                                    />
+                                  </label>
+
+                                  <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium cursor-pointer transition">
+                                    ➜] Committee Rep.
+                                    <input
+                                      accept=".pdf"
+                                      className="hidden"
+                                      onClick={() => {
+                                        setUploadModalState({
+                                          isOpen: true,
+                                          measureId: measure.id,
+                                          fieldName: "committee_report",
+                                          fieldLabel: "Committee Report",
+                                        });
+                                        setActiveDropdownId(null);
+                                        setDropdownCoords(null);
+                                      }}
+                                    />
+                                  </label>
+
+                                  <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-emerald-600 font-medium cursor-pointer transition">
+                                    ➜] Enacted Measure
+                                    <input
+                                      accept=".pdf"
+                                      className="hidden"
+                                      onClick={() => {
+                                        setUploadModalState({
+                                          isOpen: true,
+                                          measureId: measure.id,
+                                          fieldName: "scanned_measure",
+                                          fieldLabel: "Enacted Measure",
+                                        });
+                                        setActiveDropdownId(null);
+                                        setDropdownCoords(null);
+                                      }}
+                                    />
+                                  </label>
                                 </div>
-                              </React.Fragment>
-                            )}
+                              </div>
+                            </React.Fragment>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -587,6 +577,49 @@ export default function Dashboard() {
               </tbody>
             </table>
           </div>
+          {/* PAGINATION CONTROLS FOOTER */}
+          {!isLoading && filteredMeasures.length > 0 && (
+            <div className="bg-slate-50/70 border-t border-gray-200 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <p className="text-xs text-gray-500">
+                Showing <span className="font-bold text-gray-800">{indexOfFirstItem + 1}</span> to{' '}
+                <span className="font-bold text-gray-800">{Math.min(indexOfLastItem, filteredMeasures.length)}</span> of{' '}
+                <span className="font-bold text-gray-800">{filteredMeasures.length}</span> entries
+              </p>
+
+              <div className="flex items-center space-x-1.5">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  &larr; Prev
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-8 h-8 rounded-lg text-xs font-bold transition ${
+                      currentPage === page
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  Next &rarr;
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
       <AccountSettingsModal

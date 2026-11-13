@@ -42,20 +42,20 @@ export default function Login() {
         <div className="absolute -left-8 -top-8 w-48 h-48 bg-blue-700 rounded-full opacity-30 pointer-events-none" />
 
         <div className="relative z-10">
-          <span className="text-white font-bold tracking-wider text-sm uppercase">eLTS Engine</span>
+          <span className="text-white font-bold tracking-wider text-sm uppercase">e-LTS | e-Legislative Tracking System</span>
         </div>
 
         <div className="my-auto relative z-10 text-white space-y-3">
           <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight">
-            Streamline your workflow
+            Easy Tracking of Documents for Legislative Measures
           </h1>
           <p className="text-blue-100 text-sm font-light max-w-xs">
-            Track government documents, resolutions, and committee reports cleanly within a centralized repository system.
+            Track documents, ordinances, resolutions, and committee reports easily with this system.
           </p>
         </div>
 
         <div className="relative z-10 text-[10px] text-blue-200 font-light">
-          &copy; 2026 eLegislative Tracking System. Local Intranet Node.
+          &copy; 2026 eLegislative Tracking System. v1.0.0.
         </div>
       </div>
 
