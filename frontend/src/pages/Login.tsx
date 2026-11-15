@@ -42,15 +42,15 @@ export default function Login() {
         <div className="absolute -left-8 -top-8 w-48 h-48 bg-blue-700 rounded-full opacity-30 pointer-events-none" />
 
         <div className="relative z-10">
-          <span className="text-white font-bold tracking-wider text-sm uppercase">e-LTS | e-Legislative Tracking System</span>
+          <span className="text-white font-bold tracking-wider text-sm">eLTS | eLegislative Tracking System</span>
         </div>
 
         <div className="my-auto relative z-10 text-white space-y-3">
           <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight">
-            Easy Tracking of Documents for Legislative Measures
+            Welcome to eLTS
           </h1>
           <p className="text-blue-100 text-sm font-light max-w-xs">
-            Track documents, ordinances, resolutions, and committee reports easily with this system.
+            Track documents, ordinances, resolutions, and committee reports with ease. Access the system portal to manage legislative measures and monitor their progress.
           </p>
         </div>
 
@@ -66,10 +66,10 @@ export default function Login() {
           {/* Header Identity Stack */}
           <div className="space-y-1">
             <h2 className="text-xl lg:text-2xl font-bold text-gray-900 tracking-tight">
-              Login to System Portal
+              Welcome back!
             </h2>
             <p className="text-xs text-gray-500">
-              Welcome back! Please supply administrative access credentials.
+              Sign to your account
             </p>
           </div>
 
@@ -93,7 +93,7 @@ export default function Login() {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter system account name"
+                placeholder="e.g., juan.delacruz"
                 className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-gray-900 placeholder-gray-400 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50/50"
               />
             </div>

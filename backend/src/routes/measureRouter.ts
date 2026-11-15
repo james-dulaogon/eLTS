@@ -101,7 +101,7 @@ router.get("/public-track", async (req: express.Request, res: Response) => {
             lm.subject_text AS "Subject",
             lm.committee_hearing_date AS "Last Action Date",
             CASE
-            WHEN lm.ordinance_resolution_number IS NOT NULL THEN 'Enacted / Passed'
+            WHEN lm.scanned_measure_url IS NOT NULL THEN 'Enacted / Passed'
             ELSE 'In Committee Review'
             END AS "Current Status",
             lm.remarks AS "Progress Timeline / Remarks"
@@ -131,8 +131,10 @@ router.get(
       const statsQuery = `
         SELECT 
             COUNT(*)::int AS total_received,
-            COUNT(CASE WHEN ordinance_resolution_number IS NULL THEN 1 END)::int AS pending_enactment,
-            COUNT(CASE WHEN ordinance_resolution_number IS NOT NULL THEN 1 END)::int AS total_enacted
+            COUNT(CASE WHEN scanned_measure_url IS NULL THEN 1 END)::int AS pending_enactment,
+            COUNT(CASE WHEN scanned_measure_url IS NOT NULL THEN 1 END)::int AS total_enacted,
+            COUNT(CASE WHEN remarks ILIKE '%return%' THEN 1 END)::int AS total_returned,
+            COUNT(CASE WHEN committee_hearing_date IS NOT NULL THEN 1 END)::int AS total_committee_hearings
         FROM legislative_measures;
     `;
       const result = await pool.query(statsQuery);

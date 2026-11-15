@@ -30,7 +30,9 @@ interface Legislature {
 interface DashboardMetrics {
   total_received: number;
   pending_enactment: number;
+  total_returned: number;
   total_enacted: number;
+  total_committee_hearings: number;
 }
 
 type AttachmentField = "doc_received" | "committee_report" | "scanned_measure";
@@ -46,6 +48,8 @@ export default function Dashboard() {
     total_received: 0,
     pending_enactment: 0,
     total_enacted: 0,
+    total_returned: 0,
+    total_committee_hearings: 0,
   });
   const [measures, setMeasures] = useState<LegislativeMeasure[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -115,7 +119,7 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-  setCurrentPage(1);
+    setCurrentPage(1);
   }, [searchQuery]);
 
   // const handleDirectFileUpload = async (
@@ -153,10 +157,7 @@ export default function Dashboard() {
   // Safe file viewing click dispatch pipeline
   const viewDocument = (urlPath: string | null) => {
     if (!urlPath) {
-      notify(
-        "No scanned copy has been uploaded for this measure yet.",
-        "info",
-      );
+      notify("No scanned copy has been uploaded for this measure yet.", "info");
       return;
     }
     // Resolves dynamically to the Synology backend static download upload mounts
@@ -177,8 +178,10 @@ export default function Dashboard() {
   const totalPages = Math.ceil(filteredMeasures.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentMeasures = filteredMeasures.slice(indexOfFirstItem, indexOfLastItem);
-
+  const currentMeasures = filteredMeasures.slice(
+    indexOfFirstItem,
+    indexOfLastItem,
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
@@ -269,17 +272,35 @@ export default function Dashboard() {
             <p className="text-xs font-bold uppercase tracking-wider text-gray-400 group-hover:text-blue-500 transition-colors">
               Total Documents Received
             </p>
-            <p className="text-3xl font-black text-gray-900 mt-2">
+            <p className="text-3xl font-black text-gray-900 mt-2 text-center">
               {metrics.total_received}
+            </p>
+          </div>          
+
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all duration-200 hover:border-blue-600 hover:shadow-md group">
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 group-hover:text-blue-500 transition-colors">
+              Total Committee Hearings Conducted
+            </p>
+            <p className="text-3xl font-black text-blue-700 mt-2 text-center">
+              {metrics.total_committee_hearings}
             </p>
           </div>
 
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all duration-200 hover:border-blue-600 hover:shadow-md group">
             <p className="text-xs font-bold uppercase tracking-wider text-gray-400 group-hover:text-blue-500 transition-colors">
-              Needs Enactment (Pending)
+              Total Needs for Enactment (Pending)
             </p>
-            <p className="text-3xl font-black text-amber-600 mt-2">
+            <p className="text-3xl font-black text-amber-600 mt-2 text-center">
               {metrics.pending_enactment}
+            </p>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all duration-200 hover:border-blue-600 hover:shadow-md group">
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 group-hover:text-blue-500 transition-colors">
+              Returned for Enhancement (Pending)
+            </p>
+            <p className="text-3xl font-black text-red-600 mt-2 text-center">
+              {metrics.total_returned}
             </p>
           </div>
 
@@ -287,7 +308,7 @@ export default function Dashboard() {
             <p className="text-xs font-bold uppercase tracking-wider text-gray-400 group-hover:text-blue-500 transition-colors">
               Total Enacted Measures
             </p>
-            <p className="text-3xl font-black text-emerald-600 mt-2">
+            <p className="text-3xl font-black text-emerald-600 mt-2 text-center">
               {metrics.total_enacted}
             </p>
           </div>
@@ -349,7 +370,9 @@ export default function Dashboard() {
                     Ordinance/Res No.
                   </th>
                   <th className="py-3 px-4 text-center">Remarks</th>
-                  <th className="py-3.5 px-4 text-center w-[120px]">Actions</th>
+                  {user?.role === "Admin" || user?.role === "Document_Clerk" ? (
+                    <th className="py-3.5 px-4 text-center w-[120px]">Actions</th>
+                  ) : null}
                 </tr>
               </thead>
               <tbody className="block space-y-3 p-3 text-sm text-gray-900 md:table-row-group md:space-y-0 md:divide-y md:divide-gray-200 md:p-0">
@@ -408,37 +431,38 @@ export default function Dashboard() {
                             onClick={() =>
                               viewDocument(measure.doc_received_url)
                             }
-                            className="text-xs text-blue-600 hover:underline"
+                            className="bg-blue-50 hover:bg-blue-100 text-blue-600 font-medium py-1.5 px-3 rounded-md text-sm transition-colors"
                           >
-                            Received document
+                            View Doc. Rec.
                           </button>
                           <button
                             type="button"
                             onClick={() =>
                               viewDocument(measure.committee_report_url)
                             }
-                            className="text-xs text-blue-600 hover:underline"
+                            className="bg-blue-50 hover:bg-blue-100 text-blue-600 font-medium py-1.5 px-3 rounded-md text-sm transition-colors"
                           >
-                            Committee report
+                            View Com.Rep.
                           </button>
                           <button
                             type="button"
                             onClick={() =>
                               viewDocument(measure.scanned_measure_url)
                             }
-                            className="text-xs text-blue-600 hover:underline"
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-sky-50 hover:bg-sky-100 active:bg-sky-200 text-sky-700 font-medium px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-md text-sm transition-colors"
                           >
-                            Scanned measure
+                            View Ord./Res.
                           </button>
                         </div>
                       </td>
                       {/* Dropdown Menu Options */}
                       <td className="relative block py-2 px-1 text-right md:table-cell md:py-4 md:px-4 md:text-center">
-                        <div className="inline-block text-left">
-                          <button
-                            onClick={(e) => {
-                              if (activeDropdownId === measure.id) {
-                                setActiveDropdownId(null);
+                        {user?.role === "Admin" || user?.role === "Document_Clerk" ? (
+                          <div className="inline-block text-left">
+                            <button
+                              onClick={(e) => {
+                                if (activeDropdownId === measure.id) {
+                                  setActiveDropdownId(null);
                                 setDropdownCoords(null);
                               } else {
                                 const rect =
@@ -471,105 +495,107 @@ export default function Dashboard() {
                             </svg>
                           </button>
 
-                          {activeDropdownId === measure.id && dropdownCoords && (
-                            <React.Fragment>
-                              {/* Transparent backdrop layer overlay hook to easily close dropdown when clicking anywhere outside */}
-                              <div
-                                className="fixed inset-0 z-40"
-                                onClick={() => {
-                                  setActiveDropdownId(null);
-                                  setDropdownCoords(null);
-                                }}
-                              />
-                              <div
-                                ref={dropdownRef}
-                                className="fixed w-48 rounded-xl shadow-xl bg-white ring-1 ring-black ring-opacity-5 z-50 divide-y divide-gray-100 focus:outline-none border border-gray-100 animate-fade-in text-left"
-                                style={{
-                                  top: `${dropdownCoords.top}px`,
-                                  right: `${dropdownCoords.right}px`,
-                                  maxHeight: "calc(100vh - 16px)",
-                                  overflowY: "auto",
-                                }}
-                              >
-                                {/* PRIMARY ROUTE: EDIT DATA */}
-                                {(user?.role === "Admin" ||
-                                  user?.role === "Document_Clerk") && (
+                          {activeDropdownId === measure.id &&
+                            dropdownCoords && (
+                              <React.Fragment>
+                                {/* Transparent backdrop layer overlay hook to easily close dropdown when clicking anywhere outside */}
+                                <div
+                                  className="fixed inset-0 z-40"
+                                  onClick={() => {
+                                    setActiveDropdownId(null);
+                                    setDropdownCoords(null);
+                                  }}
+                                />
+                                <div
+                                  ref={dropdownRef}
+                                  className="fixed w-48 rounded-xl shadow-xl bg-white ring-1 ring-black ring-opacity-5 z-50 divide-y divide-gray-100 focus:outline-none border border-gray-100 animate-fade-in text-left"
+                                  style={{
+                                    top: `${dropdownCoords.top}px`,
+                                    right: `${dropdownCoords.right}px`,
+                                    maxHeight: "calc(100vh - 16px)",
+                                    overflowY: "auto",
+                                  }}
+                                >
+                                  {/* PRIMARY ROUTE: EDIT DATA */}
+                                  {(user?.role === "Admin" ||
+                                    user?.role === "Document_Clerk") && (
+                                    <div className="py-1">
+                                      <button
+                                        onClick={() => {
+                                          setActiveDropdownId(null);
+                                          window.location.href = `/dashboard/edit/${measure.id}`;
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium transition"
+                                      >
+                                        Edit
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {/* STREAM SECTION: SECURE CLOUD DISPATCH CHANNELS */}
                                   <div className="py-1">
-                                    <button
-                                      onClick={() => {
-                                        setActiveDropdownId(null);
-                                        window.location.href = `/dashboard/edit/${measure.id}`;
-                                      }}
-                                      className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium transition"
-                                    >
-                                      Edit
-                                    </button>
+                                    <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 font-medium transition">
+                                      Upload Attachments
+                                    </label>
+                                    <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium cursor-pointer transition">
+                                      ➜] Document Rec.
+                                      <input
+                                        accept=".pdf"
+                                        className="hidden"
+                                        onClick={() => {
+                                          setUploadModalState({
+                                            isOpen: true,
+                                            measureId: measure.id,
+                                            fieldName: "doc_received",
+                                            fieldLabel: "Documents Received",
+                                          });
+                                          setActiveDropdownId(null);
+                                          setDropdownCoords(null);
+                                        }}
+                                      />
+                                    </label>
+
+                                    <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium cursor-pointer transition">
+                                      ➜] Committee Rep.
+                                      <input
+                                        accept=".pdf"
+                                        className="hidden"
+                                        onClick={() => {
+                                          setUploadModalState({
+                                            isOpen: true,
+                                            measureId: measure.id,
+                                            fieldName: "committee_report",
+                                            fieldLabel: "Committee Report",
+                                          });
+                                          setActiveDropdownId(null);
+                                          setDropdownCoords(null);
+                                        }}
+                                      />
+                                    </label>
+
+                                    <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-emerald-600 font-medium cursor-pointer transition">
+                                      ➜] Enacted Measure
+                                      <input
+                                        accept=".pdf"
+                                        className="hidden"
+                                        onClick={() => {
+                                          setUploadModalState({
+                                            isOpen: true,
+                                            measureId: measure.id,
+                                            fieldName: "scanned_measure",
+                                            fieldLabel: "Enacted Measure",
+                                          });
+                                          setActiveDropdownId(null);
+                                          setDropdownCoords(null);
+                                        }}
+                                      />
+                                    </label>
                                   </div>
-                                )}
-
-                                {/* STREAM SECTION: SECURE CLOUD DISPATCH CHANNELS */}
-                                <div className="py-1">
-                                  <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 font-medium transition">
-                                    Upload Attachments
-                                  </label>
-                                  <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium cursor-pointer transition">
-                                    ➜] Document Rec.
-                                    <input
-                                      accept=".pdf"
-                                      className="hidden"
-                                      onClick={() => {
-                                        setUploadModalState({
-                                          isOpen: true,
-                                          measureId: measure.id,
-                                          fieldName: "doc_received",
-                                          fieldLabel: "Documents Received",
-                                        });
-                                        setActiveDropdownId(null);
-                                        setDropdownCoords(null);
-                                      }}
-                                    />
-                                  </label>
-
-                                  <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium cursor-pointer transition">
-                                    ➜] Committee Rep.
-                                    <input
-                                      accept=".pdf"
-                                      className="hidden"
-                                      onClick={() => {
-                                        setUploadModalState({
-                                          isOpen: true,
-                                          measureId: measure.id,
-                                          fieldName: "committee_report",
-                                          fieldLabel: "Committee Report",
-                                        });
-                                        setActiveDropdownId(null);
-                                        setDropdownCoords(null);
-                                      }}
-                                    />
-                                  </label>
-
-                                  <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-emerald-600 font-medium cursor-pointer transition">
-                                    ➜] Enacted Measure
-                                    <input
-                                      accept=".pdf"
-                                      className="hidden"
-                                      onClick={() => {
-                                        setUploadModalState({
-                                          isOpen: true,
-                                          measureId: measure.id,
-                                          fieldName: "scanned_measure",
-                                          fieldLabel: "Enacted Measure",
-                                        });
-                                        setActiveDropdownId(null);
-                                        setDropdownCoords(null);
-                                      }}
-                                    />
-                                  </label>
                                 </div>
-                              </div>
-                            </React.Fragment>
-                          )}
+                              </React.Fragment>
+                            )}
                         </div>
+                        ) : null}
                       </td>
                     </tr>
                   ))
@@ -581,36 +607,52 @@ export default function Dashboard() {
           {!isLoading && filteredMeasures.length > 0 && (
             <div className="bg-slate-50/70 border-t border-gray-200 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
               <p className="text-xs text-gray-500">
-                Showing <span className="font-bold text-gray-800">{indexOfFirstItem + 1}</span> to{' '}
-                <span className="font-bold text-gray-800">{Math.min(indexOfLastItem, filteredMeasures.length)}</span> of{' '}
-                <span className="font-bold text-gray-800">{filteredMeasures.length}</span> entries
+                Showing{" "}
+                <span className="font-bold text-gray-800">
+                  {indexOfFirstItem + 1}
+                </span>{" "}
+                to{" "}
+                <span className="font-bold text-gray-800">
+                  {Math.min(indexOfLastItem, filteredMeasures.length)}
+                </span>{" "}
+                of{" "}
+                <span className="font-bold text-gray-800">
+                  {filteredMeasures.length}
+                </span>{" "}
+                entries
               </p>
 
               <div className="flex items-center space-x-1.5">
                 <button
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
                   disabled={currentPage === 1}
                   className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
                 >
                   &larr; Prev
                 </button>
 
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`w-8 h-8 rounded-lg text-xs font-bold transition ${
-                      currentPage === page
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (page) => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-8 h-8 rounded-lg text-xs font-bold transition ${
+                        currentPage === page
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ),
+                )}
 
                 <button
-                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                  }
                   disabled={currentPage === totalPages || totalPages === 0}
                   className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
                 >
@@ -619,7 +661,6 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-
         </div>
       </div>
       <AccountSettingsModal

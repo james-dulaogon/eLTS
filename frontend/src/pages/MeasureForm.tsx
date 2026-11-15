@@ -212,7 +212,7 @@ export default function MeasureForm() {
               <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                 6. Ordinance / Resolution No.{" "}
                 <span className="lowercase font-normal text-gray-400">
-                  (optional)
+                  (e.g., ORD-01-2026 or RES-01-2026)
                 </span>
               </label>
               <input
