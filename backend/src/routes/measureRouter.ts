@@ -40,7 +40,7 @@ router.get(
   },
 );
 
-// 2. INGESTION ENGINE TRACKING ENDPOINT (Admin, Document Clerks)
+// 2. ADDING MEASURE API (Admin, Document Clerks)
 router.post(
   "/upload-measure",
   authenticateToken,
@@ -53,6 +53,8 @@ router.post(
         cr_number,
         committee_id,
         committee_hearing_date,
+        measure_type,
+        ordinance_resolution_number,
         legislature_id,
         remarks,
       } = req.body;
@@ -60,8 +62,8 @@ router.post(
       const insertQuery = `
             INSERT INTO legislative_measures (
                 tracking_number, subject_text, cr_number, committee_id,
-                committee_hearing_date, legislature_id, remarks, created_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;
+                committee_hearing_date,  measure_type, ordinance_resolution_number, legislature_id, remarks, created_by
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id;
         `;
 
       const result = await pool.query(insertQuery, [
@@ -70,6 +72,8 @@ router.post(
         cr_number,
         committee_id,
         committee_hearing_date,
+        measure_type,
+        ordinance_resolution_number,
         legislature_id,
         remarks,
         req.user?.id,
@@ -218,6 +222,7 @@ router.get(
             cr_number,
             committee_id,
             committee_hearing_date,
+            measure_type,
             ordinance_resolution_number,
             remarks,
             legislature_id
@@ -243,7 +248,7 @@ router.get(
   },
 );
 
-// DATA UPDATE PROCESSOR ENDPOINT: SAVE MODIFIED ROW METADATA ONLY
+// UPDATE ENDPOINT: SAVE MODIFIED ROW METADATA ONLY
 router.put(
   "/update/:id",
   authenticateToken,
@@ -266,6 +271,7 @@ router.put(
       committee_id,
       committee_hearing_date,
       legislature_id,
+      measure_type,
       remarks,
       ordinance_resolution_number,
     } = req.body;
@@ -277,6 +283,7 @@ router.put(
       !cr_number ||
       !committee_id ||
       !committee_hearing_date ||
+      !measure_type ||
       !legislature_id
     ) {
       return res.status(400).json({
@@ -294,10 +301,11 @@ router.put(
           cr_number = $3,
           committee_id = $4,
           committee_hearing_date = $5,
-          legislature_id = $6,
-          remarks = $7,
-          ordinance_resolution_number = $8
-        WHERE id = $9
+          measure_type = $6,
+          legislature_id = $7,
+          remarks = $8,
+          ordinance_resolution_number = $9
+        WHERE id = $10
         RETURNING id;
       `;
       const id = req.params.id as string;

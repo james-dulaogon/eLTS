@@ -400,11 +400,23 @@ export default function Dashboard() {
                       </td>
                       {/* Subject */}
                       <td className="block break-words py-2 px-1 md:table-cell md:py-4 md:px-6">
-                        {measure.Subject}
+                        <button
+                          type="button"
+                          onClick={() => viewDocument(measure.doc_received_url)}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          {measure.Subject}
+                        </button>
                       </td>
                       {/* CR No. / Committee */}
                       <td className="block break-words py-2 px-1 md:table-cell md:py-4 md:px-4">
-                        {measure["CR NO."]}
+                        <button
+                          type="button"
+                          onClick={() => viewDocument(measure.committee_report_url)}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          {measure["CR NO."]}
+                        </button>
                       </td>
                       {/* Committee Hearing Date */}
                       <td className="block py-2 px-1 md:table-cell md:py-4 md:px-4">
@@ -420,40 +432,17 @@ export default function Dashboard() {
                       </td>
                       {/* Ordinance/Resolution No. */}
                       <td className="block break-words py-2 px-1 md:table-cell md:py-4 md:px-4">
-                        {measure["Ordinance/Resolution No."] || "—"}
+                        <button
+                          type="button"
+                          onClick={() => viewDocument(measure.scanned_measure_url)}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          {measure["Ordinance/Resolution No."] || "—"}
+                        </button>
                       </td>
                       {/* Remarks */}
-                      <td className="block break-words py-2 px-1 md:table-cell md:py-4 md:px-4">
+                      <td className="block break-words py-2 px-1 md:table-cell md:py-4 md:px-4 text-center">
                         <p>{measure.Remarks || "—"}</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              viewDocument(measure.doc_received_url)
-                            }
-                            className="bg-blue-50 hover:bg-blue-100 text-blue-600 font-medium py-1.5 px-3 rounded-md text-sm transition-colors"
-                          >
-                            View Doc. Rec.
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              viewDocument(measure.committee_report_url)
-                            }
-                            className="bg-blue-50 hover:bg-blue-100 text-blue-600 font-medium py-1.5 px-3 rounded-md text-sm transition-colors"
-                          >
-                            View Com.Rep.
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              viewDocument(measure.scanned_measure_url)
-                            }
-                            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-sky-50 hover:bg-sky-100 active:bg-sky-200 text-sky-700 font-medium px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-md text-sm transition-colors"
-                          >
-                            View Ord./Res.
-                          </button>
-                        </div>
                       </td>
                       {/* Dropdown Menu Options */}
                       <td className="relative block py-2 px-1 text-right md:table-cell md:py-4 md:px-4 md:text-center">

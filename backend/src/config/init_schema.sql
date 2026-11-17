@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS legislative_measures (
     cr_number VARCHAR(50) NOT NULL,
     committee_id INTEGER REFERENCES committees(id) NOT NULL,
     committee_hearing_date DATE NOT NULL,
+    measure_type VARCHAR(20) DEFAULT NULL, -- 'ordinance' or 'resolution'
     ordinance_resolution_number VARCHAR(50) DEFAULT NULL,
     remarks TEXT,
     legislature_id INTEGER REFERENCES legislatures(id) NOT NULL,
@@ -59,7 +60,9 @@ CREATE TABLE IF NOT EXISTS legislative_measures (
     scanned_measure_url TEXT NULL,
 
     created_by INTEGER REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_by INTEGER REFERENCES users(id),
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Indexes for lightning fast local data access lookups

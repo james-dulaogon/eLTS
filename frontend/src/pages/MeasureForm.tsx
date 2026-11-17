@@ -23,6 +23,7 @@ export default function MeasureForm() {
   const [crNumber, setCrNumber] = useState("");
   const [committeeId, setCommitteeId] = useState("");
   const [selectedLegislatureId, setSelectedLegislatureId] = useState("");
+  const [selectedMeasureType, setSelectedMeasureType] = useState("");
   const [committeeHearingDate, setCommitteeHearingDate] = useState("");
   const [ordinanceResolutionNumber, setOrdinanceResolutionNumber] =
     useState("");
@@ -195,7 +196,7 @@ export default function MeasureForm() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                 5. Hearing Date
@@ -210,10 +211,25 @@ export default function MeasureForm() {
             </div>
             <div>
               <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                6. Ordinance / Resolution No.{" "}
-                <span className="lowercase font-normal text-gray-400">
-                  (e.g., ORD-01-2026 or RES-01-2026)
-                </span>
+                6. Type
+              </label>
+              <select
+                required
+                value={selectedMeasureType}
+                onChange={(e) => setSelectedMeasureType(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white"
+              >
+                <option value="">-- Select --</option>
+                <option value="ordinance">Ordinance</option>
+                <option value="resolution">Resolution</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                7. Ordinance / Resolution No.{" "}
+                {/* <span className="lowercase font-normal text-gray-400">
+                  
+                </span> */}
               </label>
               <input
                 type="text"
@@ -227,7 +243,7 @@ export default function MeasureForm() {
 
           <div>
             <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-              7. Title/Description of the Document Received
+              8. Title/Description of the Document Received
             </label>
             <textarea
               required
@@ -240,7 +256,7 @@ export default function MeasureForm() {
 
           <div>
             <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-              8. Remarks
+              9. Remarks
             </label>
             <textarea
               rows={2}
