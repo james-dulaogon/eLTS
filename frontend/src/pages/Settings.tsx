@@ -17,11 +17,19 @@ export default function Settings() {
   const [committeesList, setCommitteesList] = useState<any[]>([]);
   const [isSavingCommittee, setIsSavingCommittee] = useState(false);
   const [isTableLoading, setIsTableLoading] = useState(false);
+  const [editingCommitteeId, setEditingCommitteeId] = useState<number | null>(
+    null,
+  );
+  const [editingCommitteeName, setEditingCommitteeName] = useState("");
+  const [isUpdatingCommittee, setIsUpdatingCommittee] = useState(false);
   // Legislatures Module State Vectors
   const [legislatureLabel, setLegislatureLabel] = useState("");
   const [legislaturesList, setLegislaturesList] = useState<any[]>([]);
   const [isSavingLeg, setIsSavingLeg] = useState(false);
   const [isLegTableLoading, setIsLegTableLoading] = useState(false);
+  const [editingLegId, setEditingLegId] = useState<number | null>(null);
+  const [editingLegLabel, setEditingLegLabel] = useState("");
+  const [isUpdatingLeg, setIsUpdatingLeg] = useState(false);
   // User Management Module State Vectors
   const [newUserName, setNewUserName] = useState("");
   const [newUserEmail, setNewUserEmail] = useState("");
@@ -44,7 +52,28 @@ export default function Settings() {
       setIsTableLoading(false);
     }
   };
+  const handleUpdateCommittee = async (id: number) => {
+    if (!editingCommitteeName.trim()) {
+      notify("Committee name cannot be empty.", "warning");
+      return;
+    }
 
+    setIsUpdatingCommittee(true);
+    try {
+      await api.put(`/committees/${id}`, { name: editingCommitteeName });
+      notify("Committee name updated successfully.", "success");
+      setEditingCommitteeId(null);
+      setEditingCommitteeName("");
+      fetchCommittees();
+    } catch (err: any) {
+      notify(
+        err.response?.data?.error || "Failed to update committee.",
+        "error",
+      );
+    } finally {
+      setIsUpdatingCommittee(false);
+    }
+  };
   // 4. PLACE LIFECYCLE REACTION ENGINE CHECKPOINTS HERE
   useEffect(() => {
     if (activeTab === "committees") {
@@ -62,6 +91,29 @@ export default function Settings() {
       notify("Failed to sync legislative records from database.", "error");
     } finally {
       setIsLegTableLoading(false);
+    }
+  };
+
+  const handleUpdateLegislature = async (id: number) => {
+    if (!editingLegLabel.trim()) {
+      notify("Legislature term label cannot be empty.", "warning");
+      return;
+    }
+
+    setIsUpdatingLeg(true);
+    try {
+      await api.put(`/legislatures/${id}`, { term_label: editingLegLabel });
+      notify("Legislative term updated successfully.", "success");
+      setEditingLegId(null);
+      setEditingLegLabel("");
+      fetchLegislatures();
+    } catch (err: any) {
+      notify(
+        err.response?.data?.error || "Failed to update legislative term.",
+        "error",
+      );
+    } finally {
+      setIsUpdatingLeg(false);
     }
   };
 
@@ -183,12 +235,11 @@ export default function Settings() {
                 </svg>
               </div>
               <h2 className="text-base font-bold text-gray-900 tracking-tight">
-                System Configuration Console
+                System Settings
               </h2>
               <p className="text-xs font-light text-gray-500 leading-relaxed">
-                Select an administrative module tab button layout above to add,
-                modify, and track platform variables including active committees
-                registry records, legislative year bounds, and clerk profiles.
+                Select a tab above to manage committee creation, legislative
+                term creation and new user account creation.
               </p>
             </div>
           )}
@@ -239,7 +290,9 @@ export default function Settings() {
                     disabled={isSavingCommittee}
                     className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-semibold rounded-lg shadow-sm transition whitespace-nowrap"
                   >
-                    {isSavingCommittee ? "Saving Committee..." : "Save Committee"}
+                    {isSavingCommittee
+                      ? "Saving Committee..."
+                      : "Save Committee"}
                   </button>
                 </form>
               </div>
@@ -254,6 +307,7 @@ export default function Settings() {
                         <th className="py-2.5 px-4">
                           Official Registered Committee Title
                         </th>
+                        <th className="py-2.5 px-4 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-xs text-gray-700">
@@ -276,19 +330,83 @@ export default function Settings() {
                           </td>
                         </tr>
                       ) : (
-                        committeesList.map((comm, index) => (
-                          <tr
-                            key={comm.id}
-                            className="hover:bg-slate-50/40 transition"
-                          >
-                            <td className="py-3 px-4 font-mono font-bold text-gray-400">
-                              {index + 1}
-                            </td>
-                            <td className="py-3 px-4 font-medium text-gray-900">
-                              {comm.name}
-                            </td>
-                          </tr>
-                        ))
+                        committeesList.map((committee, index) => {
+                          const isEditing = editingCommitteeId === committee.id;
+
+                          return (
+                            <tr
+                              key={committee.id}
+                              className="hover:bg-slate-50/40 transition"
+                            >
+                              <td className="py-3 px-4 font-mono font-bold text-gray-400">
+                                {index + 1}
+                              </td>
+                              <td className="py-3 px-4 font-medium text-gray-900">
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    value={editingCommitteeName}
+                                    onChange={(e) =>
+                                      setEditingCommitteeName(e.target.value)
+                                    }
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter")
+                                        handleUpdateCommittee(committee.id);
+                                      if (e.key === "Escape") {
+                                        setEditingCommitteeId(null);
+                                        setEditingCommitteeName("");
+                                      }
+                                    }}
+                                    autoFocus
+                                    className="w-full px-3 py-1.5 rounded-lg border border-blue-400 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                  />
+                                ) : (
+                                  <span>{committee.name}</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-right whitespace-nowrap">
+                                {isEditing ? (
+                                  <div className="inline-flex items-center space-x-1.5">
+                                    <button
+                                      type="button"
+                                      disabled={isUpdatingCommittee}
+                                      onClick={() =>
+                                        handleUpdateCommittee(committee.id)
+                                      }
+                                      className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-[11px] font-semibold rounded-md transition"
+                                    >
+                                      {isUpdatingCommittee
+                                        ? "Saving..."
+                                        : "Save"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isUpdatingCommittee}
+                                      onClick={() => {
+                                        setEditingCommitteeId(null);
+                                        setEditingCommitteeName("");
+                                      }}
+                                      className="px-2.5 py-1 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 text-[11px] font-semibold rounded-md transition"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingCommitteeId(committee.id);
+                                      setEditingCommitteeName(committee.name);
+                                    }}
+                                    className="px-3 py-1 bg-white border border-gray-200 hover:border-blue-300 hover:text-blue-600 text-gray-600 text-[11px] font-semibold rounded-md shadow-2xs transition"
+                                  >
+                                    Edit
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -382,26 +500,76 @@ export default function Settings() {
                           </td>
                         </tr>
                       ) : (
-                        legislaturesList.map((leg, index) => (
-                          <tr
-                            key={leg.id}
-                            className="hover:bg-slate-50/40 transition"
-                          >
-                            <td className="py-3 px-4 font-mono font-bold text-gray-400">
-                              {index + 1}
-                            </td>
-                            <td className="py-3 px-4 font-medium text-gray-900 flex items-center justify-between">
-                              <span>{leg.term_label}</span>
-                              {leg.is_active && (
-                                <span className="text-[10px] px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-full font-sans font-semibold">
-                                  Default Filter focus
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
+                          legislaturesList.map((leg, index) => {
+                            const isEditing = editingLegId === leg.id;
+
+                            return (
+                              <tr key={leg.id} className="hover:bg-slate-50/40 transition">
+                                <td className="py-3 px-4 font-mono font-bold text-gray-400">
+                                  {index + 1}
+                                </td>
+
+                                {/* INLINE EDIT INPUT OR STATIC LABEL */}
+                                <td className="py-3 px-4 font-medium text-gray-900">
+                                  {isEditing ? (
+                                    <input
+                                      type="text"
+                                      value={editingLegLabel}
+                                      onChange={(e) => setEditingLegLabel(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleUpdateLegislature(leg.id);
+                                        if (e.key === 'Escape') setEditingLegId(null);
+                                      }}
+                                      autoFocus
+                                      className="w-full px-3 py-1.5 rounded-lg border border-blue-400 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                    />
+                                  ) : (
+                                    <span>{leg.term_label}</span>
+                                  )}
+                                </td>
+
+                                {/* ACTION BUTTONS */}
+                                <td className="py-3 px-4 text-right whitespace-nowrap">
+                                  {isEditing ? (
+                                    <div className="inline-flex items-center space-x-1.5">
+                                      <button
+                                        type="button"
+                                        disabled={isUpdatingLeg}
+                                        onClick={() => handleUpdateLegislature(leg.id)}
+                                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-[11px] font-semibold rounded-md transition"
+                                      >
+                                        {isUpdatingLeg ? 'Saving...' : 'Save'}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={isUpdatingLeg}
+                                        onClick={() => {
+                                          setEditingLegId(null);
+                                          setEditingLegLabel('');
+                                        }}
+                                        className="px-2.5 py-1 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 text-[11px] font-semibold rounded-md transition"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingLegId(leg.id);
+                                        setEditingLegLabel(leg.term_label);
+                                      }}
+                                      className="px-3 py-1 bg-white border border-gray-200 hover:border-blue-300 hover:text-blue-600 text-gray-600 text-[11px] font-semibold rounded-md shadow-2xs transition"
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
                   </table>
                 </div>
               </div>
@@ -409,36 +577,41 @@ export default function Settings() {
           )}
 
           {/* USER ACCOUNTS MANAGEMENT MODULE PANEL */}
-          {activeTab === 'users' && (
+          {activeTab === "users" && (
             <div className="space-y-6 w-full animate-fade-in text-left">
-              
               {/* A. ACCOUNT ENTRY CREATION COMPONENT CARD */}
               <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700">Provision New System Account</h3>
-                <form 
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700">
+                  Provision New System Account
+                </h3>
+                <form
                   onSubmit={async (e) => {
                     e.preventDefault();
                     setIsSavingUser(true);
                     try {
-                      await api.post('/users', {
+                      await api.post("/users", {
                         name: newUserName,
                         email: newUserEmail,
                         username: newUserUsername,
                         password: newUserPassword,
-                        role: newUserRole
+                        role: newUserRole,
                       });
-                      notify('New user account saved successfully.', 'success');
-                      
+                      notify("New user account saved successfully.", "success");
+
                       // Clear form states completely
-                      setNewUserName('');
-                      setNewUserEmail('');
-                      setNewUserUsername('');
-                      setNewUserPassword('');
-                      setNewUserRole('Document_Clerk');
-                      
+                      setNewUserName("");
+                      setNewUserEmail("");
+                      setNewUserUsername("");
+                      setNewUserPassword("");
+                      setNewUserRole("Document_Clerk");
+
                       fetchUsers(); // Refresh data table entries instantly
                     } catch (err: any) {
-                      notify(err.response?.data?.error || 'Failed to create user account.', 'error');
+                      notify(
+                        err.response?.data?.error ||
+                          "Failed to create user account.",
+                        "error",
+                      );
                     } finally {
                       setIsSavingUser(false);
                     }
@@ -448,16 +621,28 @@ export default function Settings() {
                   {/* Grid Row 1: Primary Profile Attributes */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Full Name</label>
-                      <input 
-                        type="text" required placeholder="e.g., Juan Dela Cruz" value={newUserName} onChange={(e) => setNewUserName(e.target.value)}
+                      <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                        Full Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g., Juan Dela Cruz"
+                        value={newUserName}
+                        onChange={(e) => setNewUserName(e.target.value)}
                         className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Email Address</label>
-                      <input 
-                        type="email" required placeholder="e.g., clerk@sangguniangbayan.gov.ph" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)}
+                      <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                        Email Address
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="e.g., clerk@sangguniangbayan.gov.ph"
+                        value={newUserEmail}
+                        onChange={(e) => setNewUserEmail(e.target.value)}
                         className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                       />
                     </div>
@@ -466,23 +651,38 @@ export default function Settings() {
                   {/* Grid Row 2: Security & Authentication Parameters */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Portal Username</label>
-                      <input 
-                        type="text" required placeholder="e.g., juandelacruz" value={newUserUsername} onChange={(e) => setNewUserUsername(e.target.value)}
+                      <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                        Portal Username
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g., juandelacruz"
+                        value={newUserUsername}
+                        onChange={(e) => setNewUserUsername(e.target.value)}
                         className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Password</label>
-                      <input 
-                        type="password" required placeholder="••••••••" value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)}
+                      <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                        Password
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        placeholder="••••••••"
+                        value={newUserPassword}
+                        onChange={(e) => setNewUserPassword(e.target.value)}
                         className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Role Assignment</label>
-                      <select 
-                        value={newUserRole} onChange={(e) => setNewUserRole(e.target.value)}
+                      <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                        Role Assignment
+                      </label>
+                      <select
+                        value={newUserRole}
+                        onChange={(e) => setNewUserRole(e.target.value)}
                         className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                       >
                         <option value="Document_Clerk">Document Clerk</option>
@@ -494,10 +694,13 @@ export default function Settings() {
 
                   <div className="flex justify-end pt-1">
                     <button
-                      type="submit" disabled={isSavingUser}
+                      type="submit"
+                      disabled={isSavingUser}
                       className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-semibold rounded-lg shadow-sm transition"
                     >
-                      {isSavingUser ? 'Saving user account...' : 'Save New User Account'}
+                      {isSavingUser
+                        ? "Saving user account..."
+                        : "Save New User Account"}
                     </button>
                   </div>
                 </form>
@@ -518,23 +721,52 @@ export default function Settings() {
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-xs text-gray-700">
                       {isUserTableLoading ? (
-                        <tr><td colSpan={5} className="text-center py-6 text-gray-400">Fetching user accounts...</td></tr>
+                        <tr>
+                          <td
+                            colSpan={5}
+                            className="text-center py-6 text-gray-400"
+                          >
+                            Fetching user accounts...
+                          </td>
+                        </tr>
                       ) : usersList.length === 0 ? (
-                        <tr><td colSpan={5} className="text-center py-6 text-gray-400 font-light italic">No user accounts have been created yet.</td></tr>
+                        <tr>
+                          <td
+                            colSpan={5}
+                            className="text-center py-6 text-gray-400 font-light italic"
+                          >
+                            No user accounts have been created yet.
+                          </td>
+                        </tr>
                       ) : (
                         usersList.map((usr, index) => (
-                          <tr key={usr.id} className="hover:bg-slate-50/40 transition">
-                            <td className="py-3 px-4 font-mono font-bold text-gray-400">{index + 1}</td>
-                            <td className="py-3 px-4 font-bold text-gray-900">{usr.name}</td>
-                            <td className="py-3 px-4 font-mono text-gray-600">{usr.username}</td>
-                            <td className="py-3 px-4 text-gray-500">{usr.email}</td>
+                          <tr
+                            key={usr.id}
+                            className="hover:bg-slate-50/40 transition"
+                          >
+                            <td className="py-3 px-4 font-mono font-bold text-gray-400">
+                              {index + 1}
+                            </td>
+                            <td className="py-3 px-4 font-bold text-gray-900">
+                              {usr.name}
+                            </td>
+                            <td className="py-3 px-4 font-mono text-gray-600">
+                              {usr.username}
+                            </td>
+                            <td className="py-3 px-4 text-gray-500">
+                              {usr.email}
+                            </td>
                             <td className="py-3 px-4">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                                usr.role === 'Admin' ? 'bg-red-50 text-red-700 border-red-100' :
-                                usr.role === 'Document_Clerk' ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                                'bg-slate-50 text-slate-700 border-slate-200'
-                              }`}>
-                                {usr.role.replace('_', ' ')}
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                                  usr.role === "Admin"
+                                    ? "bg-red-50 text-red-700 border-red-100"
+                                    : usr.role === "Document_Clerk"
+                                      ? "bg-blue-50 text-blue-700 border-blue-100"
+                                      : "bg-slate-50 text-slate-700 border-slate-200"
+                                }`}
+                              >
+                                {usr.role.replace("_", " ")}
                               </span>
                             </td>
                           </tr>
@@ -544,7 +776,6 @@ export default function Settings() {
                   </table>
                 </div>
               </div>
-
             </div>
           )}
 

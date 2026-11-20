@@ -4,7 +4,7 @@ import api from "../services/api";
 
 interface PublicTrackResult {
   "Tracking No.": string;
-  Subject: string;
+  "Subject": string;
   "Last Action Date": string;
   "Current Status": string;
   "Progress Timeline / Remarks": string;
@@ -137,7 +137,7 @@ export default function PublicTrack() {
                   Document Title / Subject Matter
                 </h4>
                 <p className="mt-1 font-medium text-gray-800 leading-relaxed">
-                  {trackResult.Subject}
+                  {trackResult["Subject"]}
                 </p>
               </div>
 

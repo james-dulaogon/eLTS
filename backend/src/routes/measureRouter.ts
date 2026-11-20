@@ -18,19 +18,21 @@ router.get(
     try {
       const queryText = `
         SELECT 
-            lm.id,
-            lm.tracking_number AS "Tracking No.",
-            lm.subject_text AS "Subject",
-            CONCAT(lm.cr_number, ' - ', c.name) AS "CR NO.",
-            lm.committee_hearing_date AS "Committee Hearing Date",
-            lm.ordinance_resolution_number AS "Ordinance/Resolution No.",
-            lm.remarks AS "Remarks",
-            lm.doc_received_url,
-            lm.committee_report_url,
-            lm.scanned_measure_url
-        FROM legislative_measures lm
-        INNER JOIN committees c ON lm.committee_id = c.id
-        ORDER BY lm.id ASC;
+          lm.id,
+          lm.legislature_id,
+          lm.tracking_number AS "Tracking No.",
+          lm.subject_text AS "Subject",
+          CONCAT(lm.cr_number, ' - ', c.name) AS "CR NO.",
+          lm.committee_hearing_date AS "Committee Hearing Date",
+          lm.measure_type AS "Measure Type",
+          lm.ordinance_resolution_number AS "Ordinance/Resolution No.",
+          lm.remarks AS "Remarks",
+          lm.doc_received_url,
+          lm.committee_report_url,
+          lm.scanned_measure_url
+      FROM legislative_measures lm
+      INNER JOIN committees c ON lm.committee_id = c.id
+      ORDER BY lm.id ASC;
     `;
       const result = await pool.query(queryText);
       return res.status(200).json(result.rows);
@@ -135,7 +137,8 @@ router.get(
       const statsQuery = `
         SELECT 
             COUNT(*)::int AS total_received,
-            COUNT(CASE WHEN scanned_measure_url IS NULL THEN 1 END)::int AS pending_enactment,
+            COUNT(CASE WHEN measure_type = 'ordinance' THEN 1 END)::int AS total_ordinances,
+            COUNT(CASE WHEN measure_type = 'resolution' THEN 1 END)::int AS total_resolutions,
             COUNT(CASE WHEN scanned_measure_url IS NOT NULL THEN 1 END)::int AS total_enacted,
             COUNT(CASE WHEN remarks ILIKE '%return%' THEN 1 END)::int AS total_returned,
             COUNT(CASE WHEN committee_hearing_date IS NOT NULL THEN 1 END)::int AS total_committee_hearings
@@ -216,18 +219,28 @@ router.get(
     try {
       const metadataQuery = `
         SELECT 
-            id,
-            tracking_number,
-            subject_text,
-            cr_number,
-            committee_id,
-            committee_hearing_date,
-            measure_type,
-            ordinance_resolution_number,
-            remarks,
-            legislature_id
-        FROM legislative_measures
-        WHERE id = $1
+            lm.id,
+            lm.tracking_number,
+            lm.subject_text,
+            lm.cr_number,
+            c.name AS committee_name,
+            lm.committee_id,
+            lm.committee_hearing_date,
+            lm.measure_type,
+            lm.ordinance_resolution_number,
+            lm.remarks,
+            l.term_label AS legislature_term,
+            l.term_label,
+            u.name AS encoded_by,
+            lm.created_at,
+            lm.doc_received_url,
+            lm.committee_report_url,
+            lm.scanned_measure_url
+        FROM legislative_measures as lm
+        INNER JOIN committees c ON lm.committee_id = c.id
+        INNER JOIN legislatures l ON lm.legislature_id = l.id
+        LEFT JOIN users u ON lm.created_by = u.id
+        WHERE lm.id = $1
         LIMIT 1;
       `;
 
@@ -236,11 +249,9 @@ router.get(
       if (result.rows.length === 0) {
         return res.status(404).json({
           error:
-            "Data Lookup Fault: No active measure profile matches that row location.",
+            "Legislative measure record not found.",
         });
       }
-
-      // Delivers only the structured metadata parameters to the polymorphic React entry page
       return res.status(200).json(result.rows[0]);
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
@@ -257,7 +268,7 @@ router.put(
     const { id } = req.params;
 
     // Verify record identifier parameters
-    if (!id || isNaN(Number(id))) {
+    if (!id || Array.isArray(id) || isNaN(Number(id))) {
       return res.status(400).json({
         error:
           "Validation Error: Invalid database record primary identifier parameter.",
@@ -304,20 +315,23 @@ router.put(
           measure_type = $6,
           legislature_id = $7,
           remarks = $8,
-          ordinance_resolution_number = $9
-        WHERE id = $10
+          ordinance_resolution_number = $9,
+          updated_by = $10,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $11
         RETURNING id;
       `;
-      const id = req.params.id as string;
       const queryParams = [
         tracking_number.trim(),
         subject_text.trim(),
         cr_number.trim(),
         parseInt(committee_id, 10),
         committee_hearing_date,
+        measure_type,
         parseInt(legislature_id, 10),
         remarks ? remarks.trim() : null,
         ordinance_resolution_number ? ordinance_resolution_number.trim() : null,
+        req.user?.id,
         parseInt(id, 10),
       ];
 

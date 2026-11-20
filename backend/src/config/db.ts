@@ -36,7 +36,7 @@ const pool = new Pool({
 // Logging status checks for tracking local system queries
 pool.on("connect", () => {
   console.log(
-    "⚡ High-performance raw PostgreSQL connection established locally.",
+    "PostgreSQL connection established locally.",
   );
 });
 

@@ -57,6 +57,7 @@ export default function MeasureForm() {
           setCrNumber(data.cr_number);
           setCommitteeId(data.committee_id.toString());
           setSelectedLegislatureId(data.legislature_id.toString());
+          setSelectedMeasureType(data.measure_type);
           setCommitteeHearingDate(data.committee_hearing_date.split("T")[0]);
           setOrdinanceResolutionNumber(data.ordinance_resolution_number || "");
           setSubjectText(data.subject_text);
@@ -80,6 +81,7 @@ export default function MeasureForm() {
       committee_id: parseInt(committeeId),
       committee_hearing_date: committeeHearingDate,
       legislature_id: parseInt(selectedLegislatureId),
+      measure_type: selectedMeasureType,
       remarks,
       ordinance_resolution_number: ordinanceResolutionNumber.trim() || null,
     };

@@ -5,8 +5,9 @@ import { useConfirmation } from "../context/ConfirmationContext";
 import AccountSettingsModal from "../components/AccountSettingsModal";
 import AdminSettingsModal from "../components/AdminSettingsModal";
 import UploadAttachmentModal from "../components/UploadAttachmentModal";
-import Settings from "./Settings";
 import api from "../services/api";
+import ExportDataModal from "../components/ExportDataModal";
+import MeasureDetailsModal from "../components/MeasureDetailsModal";
 
 interface LegislativeMeasure {
   id: number;
@@ -21,15 +22,10 @@ interface LegislativeMeasure {
   scanned_measure_url: string | null;
 }
 
-interface Legislature {
-  id: number;
-  term_label: string;
-  is_active: boolean;
-}
-
 interface DashboardMetrics {
   total_received: number;
-  pending_enactment: number;
+  total_ordinances: number;
+  total_resolutions: number;
   total_returned: number;
   total_enacted: number;
   total_committee_hearings: number;
@@ -40,22 +36,34 @@ type AttachmentField = "doc_received" | "committee_report" | "scanned_measure";
 export default function Dashboard() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAdminSettingsOpen, setIsAdminSettingsOpen] = useState(false);
-  const [isSystemSettingsOpen, setIsSystemSettingsOpen] = useState(false);
+  // const [isSystemSettingsOpen, setIsSystemSettingsOpen] = useState(false);
   const { user, logout } = useAuthStore();
   const notify = useNotifications();
   const confirm = useConfirmation();
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     total_received: 0,
-    pending_enactment: 0,
+    total_ordinances: 0,
+    total_resolutions: 0,
     total_enacted: 0,
     total_returned: 0,
     total_committee_hearings: 0,
   });
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [measures, setMeasures] = useState<LegislativeMeasure[]>([]);
+  const [selectedCommitteeFilter, setSelectedCommitteeFilter] = useState("ALL");
+  const [selectedLegislatureFilter, setSelectedLegislatureFilter] =
+    useState("ALL");
+  const [committeesList, setCommitteesList] = useState<
+    { id: number; name: string }[]
+  >([]);
+  const [legislaturesList, setLegislaturesList] = useState<
+    { id: number; term_label: string }[]
+  >([]);
+  const [viewDetailsId, setViewDetailsId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 5;
 
   {
     /* Upload Attachment Modal State Management */
@@ -83,7 +91,6 @@ export default function Dashboard() {
     if (activeDropdownId === null || !dropdownCoords || !dropdownRef.current) {
       return;
     }
-
     const dropdownHeight = dropdownRef.current.getBoundingClientRect().height;
     const belowTop = dropdownCoords.buttonBottom + 6;
     const top =
@@ -100,13 +107,16 @@ export default function Dashboard() {
     setIsLoading(true);
     try {
       // FIX: Decoupled and dropped the legislature endpoints completely from the dashboard loop
-      const [metricsRes, matrixRes] = await Promise.all([
+      const [metricsRes, matrixRes, commRes, legRes] = await Promise.all([
         api.get("/measures/metrics"),
         api.get("/measures/matrix"),
+        api.get("/committees"),
+        api.get("/legislatures/all"),
       ]);
-
       setMeasures(matrixRes.data);
       setMetrics(metricsRes.data);
+      setCommitteesList(commRes.data);
+      setLegislaturesList(legRes.data);
     } catch (err) {
       console.error("Failed to grab records", err);
     } finally {
@@ -120,39 +130,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
-
-  // const handleDirectFileUpload = async (
-  //   measureId: number,
-  //   fieldName: AttachmentField,
-  //   file: File,
-  // ) => {
-  //   if (file.type !== "application/pdf") {
-  //     notify("Only PDF documents can be uploaded.", "error");
-  //     return;
-  //   }
-
-  //   if (file.size > 20 * 1024 * 1024) {
-  //     notify("The file cannot exceed 20MB.", "error");
-  //     return;
-  //   }
-
-  //   const formData = new FormData();
-  //   formData.append("id", String(measureId));
-  //   formData.append(fieldName, file);
-
-  //   try {
-  //     await api.put("/measures/upload-single-attachment", formData, {
-  //       headers: { "Content-Type": "multipart/form-data" },
-  //     });
-  //     notify("Attachment uploaded successfully.", "success");
-  //     await fetchDashboardData();
-  //   } catch (error: unknown) {
-  //     const message =
-  //       error instanceof Error ? error.message : "Please try again.";
-  //     notify(`Attachment upload failed: ${message}`, "error");
-  //   }
-  // };
+  }, [searchQuery, selectedCommitteeFilter, selectedLegislatureFilter]);
 
   // Safe file viewing click dispatch pipeline
   const viewDocument = (urlPath: string | null) => {
@@ -168,12 +146,24 @@ export default function Dashboard() {
   };
 
   // Filter computation layer based on search box input matching Track No. or Subject strings
-  const filteredMeasures = measures.filter(
-    (m) =>
+  const filteredMeasures = measures.filter((m) => {
+    const matchesSearch =
       m["Tracking No."].toLowerCase().includes(searchQuery.toLowerCase()) ||
       m.Subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m["CR NO."].toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+      m["CR NO."].toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesCommittee =
+      selectedCommitteeFilter === "ALL" ||
+      m["CR NO."]
+        ?.toLowerCase()
+        .includes(selectedCommitteeFilter.toLowerCase());
+
+    const matchesLegislature =
+      selectedLegislatureFilter === "ALL" ||
+      (m as any).legislature_id?.toString() === selectedLegislatureFilter;
+
+    return matchesSearch && matchesCommittee && matchesLegislature;
+  });
 
   const totalPages = Math.ceil(filteredMeasures.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -268,35 +258,26 @@ export default function Dashboard() {
       {/* MAIN CONTAINER GRID LAYOUT */}
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all duration-200 hover:border-blue-600 hover:shadow-md group">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 group-hover:text-blue-500 transition-colors">
+          <div className="bg-white p-6 rounded-xl border border-blue-200 shadow-sm transition-all duration-200 hover:border-blue-600 group-hover:text-yellow-300 hover:shadow-md group">
+            <p className="inline-flex items-center capitalize leading-none text-xs border rounded-full py-1 px-3 bg-blue-600 border-blue-600 text-white font-bold">
               Total Documents Received
             </p>
-            <p className="text-3xl font-black text-gray-900 mt-2 text-center">
+            <p className="text-3xl font-black text-blue-600 mt-2 text-center">
               {metrics.total_received}
             </p>
-          </div>          
+          </div>
 
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all duration-200 hover:border-blue-600 hover:shadow-md group">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 group-hover:text-blue-500 transition-colors">
+          <div className="bg-white p-6 rounded-xl border border-orange-200 shadow-sm transition-all duration-200 hover:border-orange-400 hover:shadow-md group">
+            <p className="inline-flex items-center capitalize leading-none text-xs border rounded-full py-1 px-3 bg-orange-600 border-orange-600 text-white font-bold">
               Total Committee Hearings Conducted
             </p>
-            <p className="text-3xl font-black text-blue-700 mt-2 text-center">
+            <p className="text-3xl font-black text-orange-600 mt-2 text-center">
               {metrics.total_committee_hearings}
             </p>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all duration-200 hover:border-blue-600 hover:shadow-md group">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 group-hover:text-blue-500 transition-colors">
-              Total Needs for Enactment (Pending)
-            </p>
-            <p className="text-3xl font-black text-amber-600 mt-2 text-center">
-              {metrics.pending_enactment}
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all duration-200 hover:border-blue-600 hover:shadow-md group">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 group-hover:text-blue-500 transition-colors">
+          <div className="bg-white p-6 rounded-xl border border-red-200 shadow-sm transition-all duration-200 hover:border-red-600 hover:shadow-md group">
+            <p className="inline-flex items-center capitalize leading-none text-xs border rounded-full py-1 px-3 bg-red-600 border-red-600 text-white font-bold">
               Returned for Enhancement (Pending)
             </p>
             <p className="text-3xl font-black text-red-600 mt-2 text-center">
@@ -304,40 +285,107 @@ export default function Dashboard() {
             </p>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all duration-200 hover:border-blue-600 hover:shadow-md group">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 group-hover:text-blue-500 transition-colors">
+          <div className="bg-white p-6 rounded-xl border border-yellow-200 shadow-sm transition-all duration-200 hover:border-yellow-300 hover:shadow-md group">
+            <p className="inline-flex items-center capitalize leading-none text-xs border rounded-full py-1 px-3 bg-yellow-500 border-yellow-500 text-white font-bold">
+              Total Ordinances Enacted
+            </p>
+            <p className="text-3xl font-black text-yellow-500 mt-2 text-center">
+              {metrics.total_ordinances}
+            </p>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl border border-purple-200 shadow-sm transition-all duration-200 hover:border-purple-600 hover:shadow-md group">
+            <p className="inline-flex items-center capitalize leading-none text-xs border rounded-full py-1 px-3 bg-purple-600 border-purple-600 text-white font-bold">
+              Total Resolutions Enacted
+            </p>
+            <p className="text-3xl font-black text-purple-600 mt-2 text-center">
+              {metrics.total_resolutions}
+            </p>
+          </div>
+
+          <div className="bg-white p-6 rounded-xl border border-green-200 shadow-sm transition-all duration-200 hover:border-emerald-600 hover:shadow-md group">
+            <p className="inline-flex items-center capitalize leading-none text-xs border rounded-full py-1 px-3 bg-emerald-600 border-emerald-600 text-white font-bold">
               Total Enacted Measures
             </p>
             <p className="text-3xl font-black text-emerald-600 mt-2 text-center">
-              {metrics.total_enacted}
+              {metrics.total_resolutions + metrics.total_ordinances}
             </p>
           </div>
         </div>
 
-        {/* 3. MATRIX CONTROLS BAR: SEARCH CHANNELS & ACTIONS */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-          <div className="w-full sm:max-w-md relative">
-            <input
-              type="text"
-              placeholder="Search by Tracking No., Subject summary, or CR..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50/50"
-            />
-            <svg
-              xmlns="http://w3.org"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-              className="w-4 h-4 text-gray-400 absolute left-3 top-3"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.604 10.604z"
+        {/* 3. SEARCH */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 sm:p-4 rounded-xl border border-gray-200 shadow-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[minmax(180px,1fr)_minmax(150px,0.65fr)_minmax(170px,0.7fr)_auto] items-center gap-2 w-full lg:flex-1">
+            <div className="relative min-w-0">
+              <input
+                type="text"
+                placeholder="Search Tracking No. or Subject..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-10 pl-10 pr-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50/50"
               />
-            </svg>
+              <svg
+                xmlns="http://w3.org"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.604 10.604z"
+                />
+              </svg>
+            </div>
+
+            <select
+              value={selectedCommitteeFilter}
+              onChange={(e) => setSelectedCommitteeFilter(e.target.value)}
+              className="w-full h-10 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="ALL">All Committees</option>
+              {committeesList.map((c) => (
+                <option key={c.id} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedLegislatureFilter}
+              onChange={(e) => setSelectedLegislatureFilter(e.target.value)}
+              className="w-full h-10 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="ALL">All Legislatures</option>
+              {legislaturesList.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.term_label}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              onClick={() => setIsExportModalOpen(true)}
+              className="w-full lg:w-auto h-10 px-3 sm:px-4 py-2 bg-white hover:bg-slate-50 text-gray-700 border border-gray-300 font-semibold text-sm rounded-lg shadow-2xs transition flex items-center justify-center gap-2 whitespace-nowrap"
+            >
+              <svg
+                className="w-4 h-4 text-blue-600 shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              <span>Export Data</span>
+            </button>
           </div>
 
           {(user?.role === "Admin" || user?.role === "Document_Clerk") && (
@@ -371,7 +419,9 @@ export default function Dashboard() {
                   </th>
                   <th className="py-3 px-4 text-center">Remarks</th>
                   {user?.role === "Admin" || user?.role === "Document_Clerk" ? (
-                    <th className="py-3.5 px-4 text-center w-[120px]">Actions</th>
+                    <th className="py-3.5 px-4 text-center w-[120px]">
+                      Actions
+                    </th>
                   ) : null}
                 </tr>
               </thead>
@@ -395,7 +445,7 @@ export default function Dashboard() {
                       className="block rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-colors md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none md:hover:bg-slate-50/70 text-xs text-justify"
                     >
                       {/* Tracking No. */}
-                      <td className="block break-words py-2 px-1 font-semibold text-blue-700 md:table-cell md:py-4 md:px-4">
+                      <td className="block break-words py-2 px-1 font-semibold md:table-cell md:py-4 md:px-4">
                         {measure["Tracking No."]}
                       </td>
                       {/* Subject */}
@@ -412,7 +462,9 @@ export default function Dashboard() {
                       <td className="block break-words py-2 px-1 md:table-cell md:py-4 md:px-4">
                         <button
                           type="button"
-                          onClick={() => viewDocument(measure.committee_report_url)}
+                          onClick={() =>
+                            viewDocument(measure.committee_report_url)
+                          }
                           className="text-blue-600 hover:text-blue-800 font-medium"
                         >
                           {measure["CR NO."]}
@@ -434,7 +486,9 @@ export default function Dashboard() {
                       <td className="block break-words py-2 px-1 md:table-cell md:py-4 md:px-4">
                         <button
                           type="button"
-                          onClick={() => viewDocument(measure.scanned_measure_url)}
+                          onClick={() =>
+                            viewDocument(measure.scanned_measure_url)
+                          }
                           className="text-blue-600 hover:text-blue-800 font-medium"
                         >
                           {measure["Ordinance/Resolution No."] || "—"}
@@ -446,144 +500,214 @@ export default function Dashboard() {
                       </td>
                       {/* Dropdown Menu Options */}
                       <td className="relative block py-2 px-1 text-right md:table-cell md:py-4 md:px-4 md:text-center">
-                        {user?.role === "Admin" || user?.role === "Document_Clerk" ? (
+                        {user?.role === "Admin" ||
+                        user?.role === "Document_Clerk" ? (
                           <div className="inline-block text-left">
                             <button
                               onClick={(e) => {
                                 if (activeDropdownId === measure.id) {
                                   setActiveDropdownId(null);
-                                setDropdownCoords(null);
-                              } else {
-                                const rect =
-                                  e.currentTarget.getBoundingClientRect();
-                                setDropdownCoords({
-                                  top: rect.bottom + 6,
-                                  right: window.innerWidth - rect.right,
-                                  buttonTop: rect.top,
-                                  buttonBottom: rect.bottom,
-                                });
-                                setActiveDropdownId(measure.id);
-                              }
-                            }}
-                            className="inline-flex justify-center w-full rounded-lg border border-gray-200 shadow-sm px-3 py-1.5 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-150"
-                          >
-                            Options
-                            <svg
-                              className="ml-1.5 -mr-0.5 h-3.5 w-3.5 text-gray-400"
-                              xmlns="http://w3.org"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2.5}
+                                  setDropdownCoords(null);
+                                } else {
+                                  const rect =
+                                    e.currentTarget.getBoundingClientRect();
+                                  setDropdownCoords({
+                                    top: rect.bottom + 6,
+                                    right: window.innerWidth - rect.right,
+                                    buttonTop: rect.top,
+                                    buttonBottom: rect.bottom,
+                                  });
+                                  setActiveDropdownId(measure.id);
+                                }
+                              }}
+                              className="inline-flex justify-center w-full rounded-lg border border-gray-200 shadow-sm px-3 py-1.5 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-150"
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                              />
-                            </svg>
-                          </button>
-
-                          {activeDropdownId === measure.id &&
-                            dropdownCoords && (
-                              <React.Fragment>
-                                {/* Transparent backdrop layer overlay hook to easily close dropdown when clicking anywhere outside */}
-                                <div
-                                  className="fixed inset-0 z-40"
-                                  onClick={() => {
-                                    setActiveDropdownId(null);
-                                    setDropdownCoords(null);
-                                  }}
+                              Options
+                              <svg
+                                className="ml-1.5 -mr-0.5 h-3.5 w-3.5 text-gray-400"
+                                xmlns="http://w3.org"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2.5}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M19.5 8.25l-7.5 7.5-7.5-7.5"
                                 />
-                                <div
-                                  ref={dropdownRef}
-                                  className="fixed w-48 rounded-xl shadow-xl bg-white ring-1 ring-black ring-opacity-5 z-50 divide-y divide-gray-100 focus:outline-none border border-gray-100 animate-fade-in text-left"
-                                  style={{
-                                    top: `${dropdownCoords.top}px`,
-                                    right: `${dropdownCoords.right}px`,
-                                    maxHeight: "calc(100vh - 16px)",
-                                    overflowY: "auto",
-                                  }}
-                                >
-                                  {/* PRIMARY ROUTE: EDIT DATA */}
-                                  {(user?.role === "Admin" ||
-                                    user?.role === "Document_Clerk") && (
+                              </svg>
+                            </button>
+
+                            {activeDropdownId === measure.id &&
+                              dropdownCoords && (
+                                <React.Fragment>
+                                  {/* Transparent backdrop layer overlay hook to easily close dropdown when clicking anywhere outside */}
+                                  <div
+                                    className="fixed inset-0 z-40"
+                                    onClick={() => {
+                                      setActiveDropdownId(null);
+                                      setDropdownCoords(null);
+                                    }}
+                                  />
+                                  <div
+                                    ref={dropdownRef}
+                                    className="fixed w-48 rounded-xl shadow-xl bg-white ring-1 ring-black ring-opacity-5 z-50 divide-y divide-gray-100 focus:outline-none border border-gray-100 animate-fade-in text-left"
+                                    style={{
+                                      top: `${dropdownCoords.top}px`,
+                                      right: `${dropdownCoords.right}px`,
+                                      maxHeight: "calc(100vh - 16px)",
+                                      overflowY: "auto",
+                                    }}
+                                  >
+                                    <div>
+                                        <button
+                                          onClick={() => {
+                                            setViewDetailsId(measure.id); setActiveDropdownId(null); setDropdownCoords(null);
+                                          }}
+                                          className="w-full gap-2 flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium cursor-pointer transition"
+                                        >
+                                            <svg
+                                              xmlns="http://www.w3.org/2000/svg"
+                                              width="16"
+                                              height="16"
+                                              fill="currentColor"
+                                              className="bi bi-eye-fill"
+                                              viewBox="0 0 16 16"
+                                            >
+                                              <path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0" />
+                                              <path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8m8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7" />
+                                            </svg>
+                                            View Details
+                                        </button>
+                                      </div>
+
+                                    {/* PRIMARY ROUTE: EDIT DATA */}
+                                    {(user?.role === "Admin" ||
+                                      user?.role === "Document_Clerk") && (
+                                      <div className="py-1">
+                                        <button
+                                          onClick={() => {
+                                            setActiveDropdownId(null);
+                                            window.location.href = `/dashboard/edit/${measure.id}`;
+                                          }}
+                                          className="w-full gap-2 flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium cursor-pointer transition"
+                                        >
+                                          <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width="16"
+                                            height="16"
+                                            fill="currentColor"
+                                            className="bi bi-pencil-square"
+                                            viewBox="0 0 16 16"
+                                          >
+                                            <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z" />
+                                            <path
+                                              fill="evenodd"
+                                              d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"
+                                            />
+                                          </svg>
+                                          Edit
+                                        </button>
+                                      </div>
+                                    )}
+
+                                    {/* STREAM SECTION: SECURE CLOUD DISPATCH CHANNELS */}
                                     <div className="py-1">
-                                      <button
-                                        onClick={() => {
-                                          setActiveDropdownId(null);
-                                          window.location.href = `/dashboard/edit/${measure.id}`;
-                                        }}
-                                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium transition"
-                                      >
-                                        Edit
-                                      </button>
+                                      <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 font-medium transition">
+                                        Upload Attachments
+                                      </label>
+                                      <label className="w-full gap-2 flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium cursor-pointer transition">
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          width="16"
+                                          height="16"
+                                          fill="currentColor"
+                                          className="bi bi-upload"
+                                          viewBox="0 0 16 16"
+                                        >
+                                          <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5" />
+                                          <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708z" />
+                                        </svg>
+                                        <span>Document Rec.</span>
+                                        <input
+                                          accept=".pdf"
+                                          className="hidden"
+                                          onClick={() => {
+                                            setUploadModalState({
+                                              isOpen: true,
+                                              measureId: measure.id,
+                                              fieldName: "doc_received",
+                                              fieldLabel: "Documents Received",
+                                            });
+                                            setActiveDropdownId(null);
+                                            setDropdownCoords(null);
+                                          }}
+                                        />
+                                      </label>
+
+                                      <label className="w-full gap-2 flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium cursor-pointer transition">
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          width="16"
+                                          height="16"
+                                          fill="currentColor"
+                                          className="bi bi-upload"
+                                          viewBox="0 0 16 16"
+                                        >
+                                          <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5" />
+                                          <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708z" />
+                                        </svg>
+                                        <span>Committee Report</span>
+                                        <input
+                                          accept=".pdf"
+                                          className="hidden"
+                                          onClick={() => {
+                                            setUploadModalState({
+                                              isOpen: true,
+                                              measureId: measure.id,
+                                              fieldName: "committee_report",
+                                              fieldLabel: "Committee Report",
+                                            });
+                                            setActiveDropdownId(null);
+                                            setDropdownCoords(null);
+                                          }}
+                                        />
+                                      </label>
+
+                                      <label className="w-full gap-2 flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-emerald-600 font-medium cursor-pointer transition">
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          width="16"
+                                          height="16"
+                                          fill="currentColor"
+                                          className="bi bi-upload"
+                                          viewBox="0 0 16 16"
+                                        >
+                                          <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5" />
+                                          <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708z" />
+                                        </svg>
+                                        <span>Enacted Measure</span>
+                                        <input
+                                          accept=".pdf"
+                                          className="hidden"
+                                          onClick={() => {
+                                            setUploadModalState({
+                                              isOpen: true,
+                                              measureId: measure.id,
+                                              fieldName: "scanned_measure",
+                                              fieldLabel: "Enacted Measure",
+                                            });
+                                            setActiveDropdownId(null);
+                                            setDropdownCoords(null);
+                                          }}
+                                        />
+                                      </label>
                                     </div>
-                                  )}
-
-                                  {/* STREAM SECTION: SECURE CLOUD DISPATCH CHANNELS */}
-                                  <div className="py-1">
-                                    <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 font-medium transition">
-                                      Upload Attachments
-                                    </label>
-                                    <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium cursor-pointer transition">
-                                      ➜] Document Rec.
-                                      <input
-                                        accept=".pdf"
-                                        className="hidden"
-                                        onClick={() => {
-                                          setUploadModalState({
-                                            isOpen: true,
-                                            measureId: measure.id,
-                                            fieldName: "doc_received",
-                                            fieldLabel: "Documents Received",
-                                          });
-                                          setActiveDropdownId(null);
-                                          setDropdownCoords(null);
-                                        }}
-                                      />
-                                    </label>
-
-                                    <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-blue-600 font-medium cursor-pointer transition">
-                                      ➜] Committee Rep.
-                                      <input
-                                        accept=".pdf"
-                                        className="hidden"
-                                        onClick={() => {
-                                          setUploadModalState({
-                                            isOpen: true,
-                                            measureId: measure.id,
-                                            fieldName: "committee_report",
-                                            fieldLabel: "Committee Report",
-                                          });
-                                          setActiveDropdownId(null);
-                                          setDropdownCoords(null);
-                                        }}
-                                      />
-                                    </label>
-
-                                    <label className="w-full flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-slate-50 hover:text-emerald-600 font-medium cursor-pointer transition">
-                                      ➜] Enacted Measure
-                                      <input
-                                        accept=".pdf"
-                                        className="hidden"
-                                        onClick={() => {
-                                          setUploadModalState({
-                                            isOpen: true,
-                                            measureId: measure.id,
-                                            fieldName: "scanned_measure",
-                                            fieldLabel: "Enacted Measure",
-                                          });
-                                          setActiveDropdownId(null);
-                                          setDropdownCoords(null);
-                                        }}
-                                      />
-                                    </label>
                                   </div>
-                                </div>
-                              </React.Fragment>
-                            )}
-                        </div>
+                                </React.Fragment>
+                              )}
+                          </div>
                         ) : null}
                       </td>
                     </tr>
@@ -673,8 +797,14 @@ export default function Dashboard() {
             fieldLabel: "",
           })
         }
-        onUploadSuccess={fetchDashboardData} // Automatically triggers data re-fetch on success
+        onUploadSuccess={fetchDashboardData}
       />
+      <ExportDataModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        measures={measures}
+      />
+      <MeasureDetailsModal isOpen={viewDetailsId !== null} measureId={viewDetailsId} onClose={() => setViewDetailsId(null)} />
     </div>
   );
 }

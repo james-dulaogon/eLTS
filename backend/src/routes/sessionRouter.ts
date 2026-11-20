@@ -80,4 +80,53 @@ router.get('/all', authenticateToken, async (req: express.Request, res: express.
     }
 });
 
+// UPDATE LEGISLATURE TERM LABEL (Exclusive to Admin)
+router.put(
+  '/:id',
+  authenticateToken,
+  authorizeRoles('Admin'),
+  async (req: AuthenticatedRequest, res: express.Response) => {
+    const id = req.params.id as string;
+    const { term_label } = req.body;
+
+    if (!id || isNaN(Number(id))) {
+      return res.status(400).json({ error: 'Validation Error: Invalid legislature ID parameter.' });
+    }
+
+    if (!term_label || term_label.trim() === '') {
+      return res.status(400).json({ error: 'Validation Error: Legislature term label cannot be blank.' });
+    }
+
+    try {
+      const updateQuery = `
+        UPDATE legislatures
+        SET term_label = $1, updated_by = $2, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $3
+        RETURNING id, term_label, is_active;
+      `;
+
+      const result = await pool.query(updateQuery, [
+        term_label.trim(),
+        req.user?.id,
+        parseInt(id, 10),
+      ]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Legislature term record not found.' });
+      }
+
+      return res.status(200).json({
+        message: 'Legislative term updated successfully.',
+        data: result.rows[0],
+      });
+    } catch (error: any) {
+      if (error.code === '23505') {
+        return res.status(400).json({ error: 'System Error: This legislative term label already exists.' });
+      }
+      return res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+
 export default router;

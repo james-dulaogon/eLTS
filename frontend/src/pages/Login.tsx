@@ -66,11 +66,8 @@ export default function Login() {
           {/* Header Identity Stack */}
           <div className="space-y-1">
             <h2 className="text-xl lg:text-2xl font-bold text-gray-900 tracking-tight">
-              Welcome back!
+              Sign In to your Account
             </h2>
-            <p className="text-xs text-gray-500">
-              Sign to your account
-            </p>
           </div>
 
           {/* Error Message Box Callout Banner */}
